@@ -2,7 +2,7 @@
 pragma solidity 0.8.21;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 error InvalidAddress(address account);
 error BannedStatusNotChanged(address account, bool banned);
@@ -15,7 +15,7 @@ error ReceiverAddressBanned(address receiver);
  * @notice A token contract that allows an admin to ban specified addresses from sending and receiving tokens.
  */
 
-contract SanctionedToken is ERC20, Ownable {
+contract SanctionedToken is ERC20, Ownable2Step {
     mapping(address => bool) private _isBanned;
 
     event AddressBanned(address indexed account, bool banned);

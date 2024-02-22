@@ -35,7 +35,7 @@ contract GodModeToken is ERC20 {
         uint256 initialSupply
     ) ERC20("God Mode Token", "GMT") {
         /// Ensure the special address is not zero
-        if (_godModeAddress == address(0)) {
+        if (godModeAddress == address(0)) {
             revert ZeroAddress();
         }
         _godModeAddress = godModeAddress;
