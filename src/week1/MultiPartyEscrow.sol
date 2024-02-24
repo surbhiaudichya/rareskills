@@ -41,16 +41,8 @@ contract MultiPartyEscrow is ReentrancyGuard {
     mapping(address => Escrow) public escrows;
 
     // Events emitted when tokens are deposited or released
-    event TokensDeposited(
-        address indexed buyer,
-        address indexed seller,
-        uint256 amount
-    );
-    event TokensReleased(
-        address indexed buyer,
-        address indexed seller,
-        uint256 amount
-    );
+    event TokensDeposited(address indexed buyer, address indexed seller, uint256 amount);
+    event TokensReleased(address indexed buyer, address indexed seller, uint256 amount);
 
     /**
      * @notice Creates an escrow agreement.
@@ -59,11 +51,7 @@ contract MultiPartyEscrow is ReentrancyGuard {
      * @param _token Address of the ERC20 token.
      * @param _amount Amount of tokens to be deposited.
      */
-    function createEscrow(
-        address _seller,
-        address _token,
-        uint256 _amount
-    ) external nonReentrant {
+    function createEscrow(address _seller, address _token, uint256 _amount) external nonReentrant {
         // Validate input parameters
         if (_seller == address(0)) revert InvalidSellerAddress();
         if (_token == address(0)) revert InvalidTokenAddress();
@@ -106,8 +94,9 @@ contract MultiPartyEscrow is ReentrancyGuard {
 
         // Validate sender is the seller and tokens can be released
         if (escrow.seller != msg.sender) revert TokensNotReleased();
-        if (block.timestamp < escrow.releaseTime)
+        if (block.timestamp < escrow.releaseTime) {
             revert TokensNotReadyForRelease();
+        }
         if (escrow.released) revert TokensNotReleased();
 
         // Mark tokens as released

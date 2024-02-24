@@ -14,7 +14,6 @@ error ReceiverAddressBanned(address receiver);
  * @author Surbhi Audichya
  * @notice A token contract that allows an admin to ban specified addresses from sending and receiving tokens.
  */
-
 contract SanctionedToken is ERC20, Ownable2Step {
     mapping(address => bool) private _isBanned;
 
@@ -25,9 +24,7 @@ contract SanctionedToken is ERC20, Ownable2Step {
      * @dev Constructor to initialize the token with the specified initial supply.
      * @param initialSupply The initial supply of the token.
      */
-    constructor(
-        uint256 initialSupply
-    ) ERC20("Token with Sanctions", "SNC") Ownable(msg.sender) {
+    constructor(uint256 initialSupply) ERC20("Token with Sanctions", "SNC") Ownable(msg.sender) {
         _mint(msg.sender, initialSupply);
     }
 
@@ -68,11 +65,7 @@ contract SanctionedToken is ERC20, Ownable2Step {
      * - The sender address must not be banned.
      * - The receiver address must not be banned.
      */
-    function _update(
-        address from,
-        address to,
-        uint256 amount
-    ) internal override {
+    function _update(address from, address to, uint256 amount) internal override {
         if (isAddressBanned(from)) {
             revert SenderAddressBanned(from);
         }

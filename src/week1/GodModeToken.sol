@@ -13,14 +13,9 @@ error ZeroAddress();
  * @author Surbhi Audichya
  * @notice Token with god mode. A special address is able to transfer tokens between addresses at will.
  */
-
 contract GodModeToken is ERC20 {
     /// @notice Event emitted when a god mode transfer occurs.
-    event GodModeTransfer(
-        address indexed from,
-        address indexed to,
-        uint256 amount
-    );
+    event GodModeTransfer(address indexed from, address indexed to, uint256 amount);
 
     /// @dev  Address with god mode access
     address private immutable _godModeAddress;
@@ -30,10 +25,7 @@ contract GodModeToken is ERC20 {
      * @param godModeAddress Special Address.
      * @param initialSupply The initial supply of the token.
      */
-    constructor(
-        address godModeAddress,
-        uint256 initialSupply
-    ) ERC20("God Mode Token", "GMT") {
+    constructor(address godModeAddress, uint256 initialSupply) ERC20("God Mode Token", "GMT") {
         /// Ensure the special address is not zero
         if (godModeAddress == address(0)) {
             revert ZeroAddress();
@@ -50,11 +42,7 @@ contract GodModeToken is ERC20 {
      * @param value The amount of tokens to transfer.
      * @return success A boolean indicating whether the transfer was successful.
      */
-    function godModeTransfer(
-        address from,
-        address to,
-        uint256 value
-    ) external returns (bool success) {
+    function godModeTransfer(address from, address to, uint256 value) external returns (bool success) {
         // Ensure only the god mode address can invoke this function
         if (msg.sender != _godModeAddress) {
             revert OnlySpecialAddress(msg.sender);
