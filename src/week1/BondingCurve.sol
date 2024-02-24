@@ -56,6 +56,8 @@ contract BondingCurve is ERC20 {
         }
         reserveBalance += totalCost;
 
+        lastBuyTimestamp[msg.sender] = block.timestamp;
+
         // Update buyer's balance
         _mint(msg.sender, purchaseAmount);
 
