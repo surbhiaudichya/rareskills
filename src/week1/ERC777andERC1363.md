@@ -48,7 +48,8 @@
 ## ERC1363: Payable Token Standard
 
 ### Introduction of a Payable Token Standard
-
+  
+- ERC 1363 has a better UX for this. The regular transfer function behaves like a normal ERC20, so we don’t get any sneaky reentrancy issues. However, if we want to alert the contract it received tokens, we use the transferAndCall method.
 - ERC1363 defines a token interface for ERC20 tokens that supports executing recipient code after transfer or approval.
 - It allows token payments to trigger recipient code execution in a single transaction, eliminating the need for separate approval and payment transactions.
 
