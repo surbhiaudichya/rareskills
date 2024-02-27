@@ -5,6 +5,7 @@
  * The price of tokens is determined by a linear bonding curve equation: P(S) = priceChangeRate * totalSupply + initialPrice
  * where P(S) is the price, S is the total supply, priceChangeRate is the rate of change of price per token minted or burned,
  * and initialPrice is the initial price of tokens.
+ * Trade Price equalt to ∫P(S)dS = 1/2 * priceChangeRate×S^2 + initialPrice * S
  * Tokens can be minted by sending ether to the contract, and the cost is calculated based on the current bonding curve equation.
  * Tokens can be burned to receive ether, and the value received is calculated based on the current bonding curve equation.
  */
@@ -102,17 +103,17 @@ contract BondingCurve is ERC20 {
     }
 
     /**
-     * @dev Calculate the cost to buy a specified amount of tokens.
+     * @dev Calculate the trade cost to buy a specified amount of tokens.
      * @param purchaseAmount The amount of tokens to purchase.
      * @return totalCost The total cost to purchase the specified amount of tokens.
      */
     function getCostToBuy(uint256 purchaseAmount) public view returns (uint256 totalCost) {
         uint256 currentTotalSupply = totalSupply();
         uint256 reserveBeforeTrade =
-            (priceChangeRate * currentTotalSupply ** 2) / 2e36 + (initialPrice * currentTotalSupply) / 1e18;
+            (priceChangeRate * currentTotalSupply ** 2) / 2 + (initialPrice * currentTotalSupply);
         uint256 updatedTotalSupply = currentTotalSupply + purchaseAmount;
         uint256 reserveAfterTrade =
-            (priceChangeRate * updatedTotalSupply ** 2) / 2e36 + (initialPrice * updatedTotalSupply) / 1e18;
+            (priceChangeRate * updatedTotalSupply ** 2) / 2 + (initialPrice * updatedTotalSupply);
         totalCost = reserveAfterTrade - reserveBeforeTrade;
         return totalCost;
     }
@@ -126,9 +127,9 @@ contract BondingCurve is ERC20 {
         uint256 currentTotalSupply = totalSupply();
         uint256 updatedTotalSupply = currentTotalSupply - purchaseAmount;
         uint256 reserveBeforeTrade =
-            (priceChangeRate * currentTotalSupply ** 2) / 2e36 + (initialPrice * currentTotalSupply) / 1e18;
+            (priceChangeRate * currentTotalSupply ** 2) / 2 + (initialPrice * currentTotalSupply);
         uint256 reserveAfterTrade =
-            (priceChangeRate * updatedTotalSupply ** 2) / 2e36 + (initialPrice * updatedTotalSupply) / 1e18;
+            (priceChangeRate * updatedTotalSupply ** 2) / 2 + (initialPrice * updatedTotalSupply);
         totalCost = reserveBeforeTrade - reserveAfterTrade;
         return totalCost;
     }
