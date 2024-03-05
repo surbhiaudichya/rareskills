@@ -3,7 +3,7 @@
  * @title MerkleWhitelistNFT
  * @dev The ERC721 NFT with merkle tree discount, include ERC2918 royalty. Addresses in a merkle tree can mint NFTs at a discount
  */
-pragma solidity 0.8.21;
+pragma solidity >= 0.6.0 < 0.9.0;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
