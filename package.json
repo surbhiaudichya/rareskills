@@ -1,0 +1,28 @@
+{
+  "name": "rareskills-advanced-solidity-bootcamp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "devDependencies": {
+    "@openzeppelin/merkle-tree": "^1.0.6",
+    "prettier": "^3.0.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/surbhiaudichya/rareskills-advanced-solidity-bootcamp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/surbhiaudichya/rareskills-advanced-solidity-bootcamp/issues"
+  },
+  "type": "module"
+}
