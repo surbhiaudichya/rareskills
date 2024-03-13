@@ -63,12 +63,12 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
             revert AlreadyMinted(); // Ensure address not already minted
         }
 
-        if (msg.value != WHITELIST_MINT_PRICE) {
+        if (msg.value < WHITELIST_MINT_PRICE) {
             revert InsufficientEther(); // Ensure correct amount of ether sent
         }
 
         // Verify the provided _merkleProof
-        bytes32 leaf = keccak256(abi.encode(msg.sender));
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender, index))));
 
         if (!MerkleProof.verify(_merkleProof, merkleRoot, leaf)) {
             revert InvalidMerkleProof(); // Ensure valid Merkle proof
@@ -91,7 +91,7 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
             revert MaxSupplyReached(); // Ensure maximum supply not reached
         }
 
-        if (msg.value != MINT_PRICE) {
+        if (msg.value < MINT_PRICE) {
             revert InsufficientEther(); // Ensure correct amount of ether sent
         }
 
