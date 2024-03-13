@@ -18,9 +18,9 @@ contract StakingContract is IERC721Receiver {
     // Amount of reward tokens to distribute per 24 hours
     uint256 rewardPer24Hours = 10e18;
     // Duration of a day in seconds
-    uint256 perDay = 24 hours;
+    uint256 perDay = 1 days;
     // Timestamp of the last reward distribution
-    uint256 lastRewardTimestamp;
+    uint256 public lastRewardTimestamp;
     // Amount of reward tokens per token staked
     uint256 accRewardPerToken;
 
@@ -35,6 +35,9 @@ contract StakingContract is IERC721Receiver {
         uint256 totalBalance; // Total balance of staked NFTs
         uint256 debt; // Accumulated debt for rewards
     }
+
+    // Custom errors
+    error IncorrectOwner();
 
     constructor(address _nft) {
         nft = _nft;
@@ -60,15 +63,15 @@ contract StakingContract is IERC721Receiver {
 
         // Update the reward
         UpdateReward();
+
         // Mint rewards to the user
-        if (users[msg.sender].totalBalance > 0) {
-            uint256 rewardToMint = users[msg.sender].totalBalance * accRewardPerToken - users[msg.sender].debt;
-            RewardToken(rewardToken).mint(msg.sender, rewardToMint);
+        if (users[from].totalBalance > 0) {
+            uint256 rewardToMint = users[from].totalBalance * accRewardPerToken - users[from].debt;
+            RewardToken(rewardToken).mint(from, rewardToMint);
         }
 
         // Update user data
-        users[msg.sender] =
-            User({totalBalance: users[msg.sender].totalBalance++, debt: users[msg.sender].debt + accRewardPerToken});
+        users[from] = User({totalBalance: users[from].totalBalance + 1, debt: users[from].debt + accRewardPerToken});
 
         // Record the stake
         stakes[tokenId] = Stake({stackingTime: block.timestamp, originalOwner: from});
@@ -79,9 +82,21 @@ contract StakingContract is IERC721Receiver {
     // Users can withdraw NFT at any time
     function withdraw(uint256 tokenId) external {
         // Ensure that the sender is the original owner of the NFT
-        if (msg.sender == stakes[tokenId].originalOwner) {
-            revert();
+        if (msg.sender != stakes[tokenId].originalOwner) {
+            revert IncorrectOwner();
         }
+
+        // Update the reward
+        UpdateReward();
+
+        uint256 rewardToMint = users[msg.sender].totalBalance * accRewardPerToken - users[msg.sender].debt;
+        RewardToken(rewardToken).mint(msg.sender, rewardToMint);
+
+        // Update user data
+        users[msg.sender] = User({totalBalance: users[msg.sender].totalBalance - 1, debt: users[msg.sender].debt});
+
+        delete stakes[tokenId];
+
         // Transfer the NFT back to the original owner
         ERC721(nft).safeTransferFrom(address(this), msg.sender, tokenId);
     }
@@ -93,12 +108,11 @@ contract StakingContract is IERC721Receiver {
             uint256 stakedNFTSupply = ERC721(nft).balanceOf(address(this));
 
             // Ensure there are staked NFTs
-            if (stakedNFTSupply > 0) {
-                uint256 rewardPerTokenPerSecond = rewardPer24Hours / (perDay);
+            if (lastRewardTimestamp != 0) {
                 uint256 timeSinceLastReward = block.timestamp - lastRewardTimestamp;
 
                 // Calculate the reward per token accumulated during the staking period
-                uint256 rewardPerTokenAccumulated = rewardPerTokenPerSecond * timeSinceLastReward;
+                uint256 rewardPerTokenAccumulated = (rewardPer24Hours * timeSinceLastReward) / perDay;
 
                 // Update the accumulated reward per token
                 accRewardPerToken += rewardPerTokenAccumulated;
