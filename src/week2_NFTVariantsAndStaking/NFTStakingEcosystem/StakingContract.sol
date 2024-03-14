@@ -5,94 +5,147 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC721, IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {RewardToken} from "./RewardToken.sol";
 
+/**
+ * @title StakingContract
+ * @author Surbhi Audichya
+ * @notice This contract allows users to stake ERC721 tokens and receive rewards in ERC20 tokens.
+ */
 contract StakingContract is IERC721Receiver {
-    address nft;
+    // Immutable address of the ERC721 contract
+    address public immutable nft;
+    // Immutable instance of the RewardToken contract
     RewardToken public immutable rewardToken;
-    uint256 rewardPer24Hours = 10e18;
-    uint256 perDay = 1 days;
+    // Reward amount per 24 hours
+    uint256 public constant rewardPer24Hours = 10e18;
+    // Duration of one day
+    uint256 public constant perDay = 1 days;
+    // Timestamp of the last reward calculation
     uint256 public lastRewardTimestamp;
-    uint256 accRewardPerToken;
+    // Accumulated reward per token
+    uint256 public accRewardPerToken;
 
-    struct Stake {
-        uint256 stackingTime;
-        address originalOwner;
-    }
-
+    // Struct to represent a user
     struct User {
-        uint256 totalBalance;
-        uint256 debt;
+        uint256 totalBalance; // Total number of tokens staked by the user
+        uint256 debt; // Debt accumulated by the user (for reward calculation)
     }
 
-    error IncorrectOwner();
-    error NFTContractOnly();
+    // Mapping to track stakes by token ID
+    mapping(uint256 tokenId => address originalOwner) public stakes;
 
-    event NFTDeposited(address indexed user, uint256 tokenId);
-    event NFTWithdrawn(address indexed user, uint256 tokenId);
-    event RewardsClaimed(address indexed user, uint256 rewardToMint, uint256 amount);
-
-    constructor(address _nft) {
-        nft = _nft;
-        rewardToken = new RewardToken();
-    }
-
-    mapping(uint256 => Stake) public stakes;
+    // Mapping to track users' balances and debts
     mapping(address => User) public users;
 
+    // Custom errors
+    error IncorrectOwner(); // Error thrown when a user tries to withdraw a stake that they don't own
+    error NFTContractOnly(); // Error thrown when a non-NFT contract tries to interact with the staking contract
+
+    // Events
+    event NFTDeposited(address indexed user, uint256 tokenId); // Event emitted when an NFT is deposited
+    event NFTWithdrawn(address indexed user, uint256 tokenId); // Event emitted when an NFT is withdrawn
+    event RewardsClaimed(address indexed user, uint256 rewardToMint); // Event emitted when rewards are claimed
+
+    // Constructor function
+    constructor(address _nft) {
+        nft = _nft;
+        rewardToken = new RewardToken(); // Deploy a new instance of the RewardToken contract
+    }
+
+    /**
+     * @notice Handles the reception of ERC721 tokens
+     * @dev This function is called when ERC721 tokens are transferred to this contract
+     * @param from The address sending the ERC721 tokens
+     * @param tokenId The ID of the ERC721 token being transferred
+     * @return selector The ERC721 interface ID
+     */
     function onERC721Received(address, address from, uint256 tokenId, bytes calldata)
         public
         override
         returns (bytes4 selector)
     {
+        // Ensure the token is coming from the NFT contract
         if (msg.sender != address(nft)) {
             revert NFTContractOnly();
         }
 
+        // Update the accumulated reward
         UpdateReward();
 
+        // Check if the user has a positive balance
+        uint256 rewardToMint = 0;
         if (users[from].totalBalance > 0) {
-            uint256 rewardToMint = users[from].totalBalance * accRewardPerToken - users[from].debt;
+            // Calculate the reward to be minted
+            rewardToMint = users[from].totalBalance * accRewardPerToken - users[from].debt;
+            // Mint the reward tokens and emit an event
             RewardToken(rewardToken).mint(from, rewardToMint);
-            emit RewardsClaimed(from, rewardToMint, rewardToMint);
         }
+        emit RewardsClaimed(from, rewardToMint);
 
-        users[from] = User({totalBalance: users[from].totalBalance + 1, debt: users[from].debt + accRewardPerToken});
-        stakes[tokenId] = Stake({stackingTime: block.timestamp, originalOwner: from});
+        // Update the user's balance and debt
+        users[from].totalBalance += 1;
+        users[from].debt += accRewardPerToken;
 
+        // Record the stake
+        stakes[tokenId] = from;
+
+        // Emit an event for the deposit
         emit NFTDeposited(from, tokenId);
 
         return IERC721Receiver.onERC721Received.selector;
     }
 
+    /**
+     * @notice Allows a user to withdraw their staked ERC721 token and claim accrued rewards
+     * @dev Only the original owner of the stake can withdraw
+     * @param tokenId The ID of the ERC721 token to be withdrawn
+     */
     function withdraw(uint256 tokenId) external {
-        if (msg.sender != stakes[tokenId].originalOwner) {
+        // Ensure only the original owner can withdraw
+        if (msg.sender != stakes[tokenId]) {
             revert IncorrectOwner();
         }
 
+        // Update the accumulated reward
         UpdateReward();
 
+        // Calculate the reward to be minted
         uint256 rewardToMint = users[msg.sender].totalBalance * accRewardPerToken - users[msg.sender].debt;
+
+        // Mint the reward tokens and emit an event
         RewardToken(rewardToken).mint(msg.sender, rewardToMint);
-        emit RewardsClaimed(msg.sender, rewardToMint, rewardToMint);
+        emit RewardsClaimed(msg.sender, rewardToMint);
 
-        users[msg.sender] = User({totalBalance: users[msg.sender].totalBalance - 1, debt: users[msg.sender].debt});
+        // Update the user's balance and debt
+        users[msg.sender].totalBalance -= 1;
+        users[msg.sender].debt = 0;
 
+        // Delete the stake
         delete stakes[tokenId];
 
+        // Transfer the NFT back to the owner
         ERC721(nft).safeTransferFrom(address(this), msg.sender, tokenId);
 
+        // Emit an event for the withdrawal
         emit NFTWithdrawn(msg.sender, tokenId);
     }
 
+    /**
+     * @notice Updates the accumulated reward per token
+     * @dev This function calculates the accumulated reward per token based on the time elapsed since the last update
+     */
     function UpdateReward() internal {
         if (block.timestamp > lastRewardTimestamp) {
-            if (lastRewardTimestamp != 0) {
+            if (lastRewardTimestamp > 0) {
                 uint256 timeSinceLastReward = block.timestamp - lastRewardTimestamp;
 
-                uint256 rewardPerTokenAccumulated = (rewardPer24Hours * timeSinceLastReward) / perDay;
+                // Calculate the reward accumulated since the last update
+                uint256 rewardAccumulated = (rewardPer24Hours * timeSinceLastReward) / perDay;
 
-                accRewardPerToken += rewardPerTokenAccumulated;
+                // Update the accumulated reward per token
+                accRewardPerToken += rewardAccumulated;
             }
 
+            // Update the last reward timestamp
             lastRewardTimestamp = block.timestamp;
         }
     }
