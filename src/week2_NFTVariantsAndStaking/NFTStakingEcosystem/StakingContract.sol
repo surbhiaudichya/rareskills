@@ -67,27 +67,21 @@ contract StakingContract is IERC721Receiver {
         if (msg.sender != address(nft)) {
             revert NFTContractOnly();
         }
-
         // Update the accumulated reward
         UpdateReward();
 
-        // Check if the user has a positive balance
-        uint256 rewardToMint = 0;
-        if (users[from].totalBalance > 0) {
-            // Calculate the reward to be minted
-            rewardToMint = users[from].totalBalance * accRewardPerToken - users[from].debt;
-            // Mint the reward tokens and emit an event
-            RewardToken(rewardToken).mint(from, rewardToMint);
-        }
-        emit RewardsClaimed(from, rewardToMint);
+        // Calculate the reward to be minted
+        uint256 rewardToMint = users[from].totalBalance * accRewardPerToken - users[from].debt;
 
         // Update the user's balance and debt
         users[from].totalBalance += 1;
-        users[from].debt += accRewardPerToken;
+        users[from].debt = users[from].totalBalance * accRewardPerToken;
 
+        // Mint the reward tokens and emit an event
+        if (rewardToMint > 0) RewardToken(rewardToken).mint(from, rewardToMint);
+        emit RewardsClaimed(from, rewardToMint);
         // Record the stake
         stakes[tokenId] = from;
-
         // Emit an event for the deposit
         emit NFTDeposited(from, tokenId);
 
@@ -117,7 +111,7 @@ contract StakingContract is IERC721Receiver {
 
         // Update the user's balance and debt
         users[msg.sender].totalBalance -= 1;
-        users[msg.sender].debt = 0;
+        users[msg.sender].debt = users[msg.sender].totalBalance * accRewardPerToken;
 
         // Delete the stake
         delete stakes[tokenId];
