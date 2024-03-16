@@ -14,6 +14,7 @@ contract EnumerableNFT is ERC721Enumerable, Ownable2Step {
     uint256 public constant MINT_PRICE = 0.5 ether; // Price for regular minting
 
     event Minted(address indexed sender, uint256 indexed tokenId);
+    event WithdrawEther(address owner, uint256 amount);
 
     // Custom errors
     error InsufficientEther(); // Error for insufficient ether sent
@@ -30,7 +31,7 @@ contract EnumerableNFT is ERC721Enumerable, Ownable2Step {
      * @param _tokenId The token ID to mint.
      */
     function mint(uint256 _tokenId) external payable {
-        if (_tokenId > 100 || _tokenId == 0) {
+        if (_tokenId > 100 || _tokenId < 1) {
             // Check if the token ID is within valid range
             revert InvalidTokenId();
         }
@@ -54,6 +55,8 @@ contract EnumerableNFT is ERC721Enumerable, Ownable2Step {
      * @dev Allows the owner to withdraw accumulated ether.
      */
     function withdrawEther() external onlyOwner {
+        uint256 amount = address(this).balance;
         payable(owner()).transfer(address(this).balance); // Transfer ether to owner
+        emit WithdrawEther(msg.sender, amount);
     }
 }
