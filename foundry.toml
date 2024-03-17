@@ -7,4 +7,5 @@ remappings = [
     "@openzeppelin/merkle-tree=lib/merkle-tree",
 ]
 
+gas_reports = ["*"]
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

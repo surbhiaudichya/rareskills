@@ -19,8 +19,8 @@ contract AttackOvermint2_Test is Test {
     }
 
     /// @dev It should mint 5 overmint1 NFTs to attacker address
-    function test_AttackOvermint1_MintFiveNFTs() external {
-        vm.prank(attacker);
+    function test_AttackOvermint2_MintFiveNFTs() external {
+        vm.startPrank(attacker);
         attackOvermint2.exploitOvermint2();
         assertTrue(overmint2.success(), "Balance should be equal to five");
     }
