@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: MIT
-/**
- * @title MerkleWhitelistNFT
- * @dev The ERC721 NFT with merkle tree discount, include ERC2918 royalty. Addresses in a merkle tree can mint NFTs at a discount
- */
+
 pragma solidity >= 0.6.0 < 0.9.0;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -11,8 +8,10 @@ import {BitMaps} from "@openzeppelin/contracts/utils/structs/BitMaps.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-// single leaf node represents a single wallet address in our whitelist.
-
+/**
+ * @title MerkleWhitelistNFT
+ * @dev The ERC721 NFT with merkle tree discount, include ERC2918 royalty. Addresses in a merkle tree can mint NFTs at a discount
+ */
 contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
     bytes32 public immutable merkleRoot; // Merkle root hash of the whitelist
     uint256 public constant MAX_SUPPLY = 1000; // Maximum supply of the NFTs
@@ -23,7 +22,7 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
     BitMaps.BitMap private _bitmap; // Bit map to track whitelisted addresses
 
     event Minted(address indexed sender, uint256 indexed tokenId); // Event emitted upon successful minting
-    event Burn(address indexed sender, uint256 indexed tokenId); // Event emitted upon burning an NFT
+    event WithdrawEther(address owner, uint256 amount);
 
     // Custom errors
     error InsufficientEther(); // Error for insufficient ether sent
@@ -106,6 +105,8 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
      * @dev Allows the owner to withdraw accumulated ether.
      */
     function withdrawEther() external onlyOwner {
+        uint256 amount = address(this).balance;
         payable(owner()).transfer(address(this).balance); // Transfer ether to owner
+        emit WithdrawEther(msg.sender, amount);
     }
 }

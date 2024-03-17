@@ -5,17 +5,47 @@ import {
     StakingContract, RewardToken
 } from "../../src/week2_NFTVariantsAndStaking/NFTStakingEcosystem/StakingContract.sol";
 import {MerkleWhitelistNFT} from "../../src/week2_NFTVariantsAndStaking/NFTStakingEcosystem/MerkleWhitelistNFT.sol";
-import {MerkleWhitelistNFTTest} from "./MerkleWhitelistNFT.t.sol";
+import {MerkleWhitelistNFT_Test} from "./MerkleWhitelistNFT.t.sol";
+import {WrongNFT} from "./Mock/WrongNFT.sol";
 import "forge-std/console.sol";
 
-contract StakingContractTest is MerkleWhitelistNFTTest {
-    StakingContract private stakingContract;
+contract StakingContract_Test is MerkleWhitelistNFT_Test {
+    /// Custom errors
+    error IncorrectOwner();
+    error NFTContractOnly();
 
+    /// Events
+    event NFTDeposited(address indexed user, uint256 tokenId);
+    event NFTWithdrawn(address indexed user, uint256 tokenId);
     event RewardsClaimed(address indexed user, uint256 rewardToMint);
 
+    /// VARIABLES
+    StakingContract private stakingContract;
+    WrongNFT private wrongNFT;
+
+    /// SETUP FUNCTION
     function setUp() public override {
         super.setUp();
         stakingContract = new StakingContract(address(nft));
+        wrongNFT = new WrongNFT();
+    }
+
+    /// @dev It should test deployment
+    function test_Deployment() external {
+        address expectedNFT = address(nft);
+        address actualNFT = stakingContract.nft();
+        assertEq(expectedNFT, actualNFT, "nft address");
+        RewardToken rewardToken = RewardToken(stakingContract.rewardToken());
+        assertEq(rewardToken.name(), "RewardToken", "name");
+        assertEq(rewardToken.symbol(), "RT", "symbol");
+    }
+
+    /// @dev It should revert.
+    function test_RevertWhen_OnERC721Received_WrongNFT() external {
+        vm.startPrank(userA);
+        wrongNFT.mint(1);
+        vm.expectRevert(abi.encodeWithSelector(NFTContractOnly.selector));
+        wrongNFT.safeTransferFrom(userA, address(stakingContract), 1);
     }
 
     function setUpMintNFTToUser(address user, uint256 tokenId) internal {
@@ -23,14 +53,70 @@ contract StakingContractTest is MerkleWhitelistNFTTest {
         nft.mint{value: 0.5 ether}(tokenId);
     }
 
-    function test_Stake(uint256 tokenId) public {
+    /// @dev It should should set lastRewardTimestamp to block.timestamp, reward to mint should be zero
+    function test_Stake_StartStakingRewardToMintZero(uint256 tokenId) external {
+        uint256 rewardAmount = 0;
+        vm.assume(tokenId < 1000);
+        setUpMintNFTToUser(userA, tokenId);
+        vm.expectEmit(true, true, true, true);
+        emit RewardsClaimed(userA, rewardAmount);
+        nft.safeTransferFrom(userA, address(stakingContract), tokenId);
+    }
+
+    /// @dev It should set lastRewardTimestamp to block.timestamp.abi
+    function test_Stake_StartStackingSetLastRewardTimestamp(uint256 tokenId) external {
+        vm.assume(tokenId < 1000);
+        setUpMintNFTToUser(userA, tokenId);
+        nft.safeTransferFrom(userA, address(stakingContract), tokenId);
+        assertEq(stakingContract.lastRewardTimestamp(), block.timestamp, "block.timestamp");
+    }
+
+    /// @dev It Should set user struct data totalBalance and debt.abi
+    function test_Stake_StartStackingSetUsersTotalBalanceAndDebt(uint256 tokenId) external {
+        vm.assume(tokenId < 1000);
+        setUpMintNFTToUser(userA, tokenId);
+        nft.safeTransferFrom(userA, address(stakingContract), tokenId);
+        (uint256 totalBalance, uint256 debt) = stakingContract.users(userA);
+        assertEq(totalBalance, 1, "increment total balance to 1");
+        assertEq(debt, 0, "set debt to zero since it is the first user to start staking");
+    }
+
+    /// @dev It Should set stackes mapping.
+    function test_Stake_SetStakesMappingTokenIDToOriginalOwner(uint256 tokenId) external {
+        vm.assume(tokenId < 1000);
+        setUpMintNFTToUser(userA, tokenId);
+        address expectedSender = userA;
+        nft.safeTransferFrom(userA, address(stakingContract), tokenId);
+        address actualSender = stakingContract.stakes(tokenId);
+        assertEq(expectedSender, actualSender, "original orwner of staked tokenId");
+    }
+
+    /// @dev It should transfer tokenId to staking contract.
+    function test_Stake_TransferNFTToStakingContract(uint256 tokenId) external {
+        vm.assume(tokenId < 1000);
+        setUpMintNFTToUser(userA, tokenId);
+        address expectedOwner = address(stakingContract);
+        nft.safeTransferFrom(userA, address(stakingContract), tokenId);
+        address actualOwner = nft.ownerOf(tokenId);
+        assertEq(expectedOwner, actualOwner, "transfer NFT");
+    }
+
+    /// @dev Should emit RewardsClaimed event.
+    function test_Stake_EmitNFTDeposited(uint256 tokenId) public {
+        vm.assume(tokenId < 1000);
+        setUpMintNFTToUser(userA, tokenId);
+        vm.expectEmit(true, true, true, true);
+        emit NFTDeposited(userA, tokenId);
+        nft.safeTransferFrom(userA, address(stakingContract), tokenId);
+    }
+
+    /// @dev Should emit RewardsClaimed event.
+    function test_Stake_EmitRewardsClaimed(uint256 tokenId) public {
         vm.assume(tokenId < 1000);
         setUpMintNFTToUser(userA, tokenId);
         vm.expectEmit(true, false, false, true);
         emit RewardsClaimed(userA, 0);
         nft.safeTransferFrom(userA, address(stakingContract), tokenId);
-        assertEq(nft.ownerOf(tokenId), address(stakingContract));
-        assertEq(stakingContract.lastRewardTimestamp(), block.timestamp);
     }
 
     function test_StakeMultipleTimes() public {
