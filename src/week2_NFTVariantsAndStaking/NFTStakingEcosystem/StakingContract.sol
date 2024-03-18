@@ -16,9 +16,9 @@ contract StakingContract is IERC721Receiver {
     // Immutable instance of the RewardToken contract
     RewardToken public immutable rewardToken;
     // Reward amount per 24 hours
-    uint256 public constant rewardPer24Hours = 10e18;
+    uint256 public constant REWARD_PER_DAY = 10e18;
     // Duration of one day
-    uint256 public constant perDay = 1 days;
+    uint256 public constant PER_DAY = 1 days;
     // Timestamp of the last reward calculation
     uint256 public lastRewardTimestamp;
     // Accumulated reward per token
@@ -126,7 +126,7 @@ contract StakingContract is IERC721Receiver {
             if (_lastRewardTimestamp > 0) {
                 uint256 timeSinceLastReward = block.timestamp - _lastRewardTimestamp;
                 // Calculate the reward accumulated since the last update
-                uint256 rewardAccumulated = (rewardPer24Hours * timeSinceLastReward) / perDay;
+                uint256 rewardAccumulated = (REWARD_PER_DAY * timeSinceLastReward) / PER_DAY;
                 // Update the accumulated reward per token
                 accRewardPerToken += rewardAccumulated;
             }
