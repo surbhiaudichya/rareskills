@@ -20,6 +20,7 @@ contract EnumerableNFT is ERC721Enumerable, Ownable2Step {
     error InsufficientEther(); // Error for insufficient ether sent
     error MaxSupplyReached(); // Error when maximum supply of NFTs is reached
     error InvalidTokenId(); // Error for invalid token ID
+    error FailedToSendEther(); // Error when withdrawEther fail
 
     /**
      * @dev Constructor to initialize the contract with name and symbol, and set the owner.
@@ -56,7 +57,10 @@ contract EnumerableNFT is ERC721Enumerable, Ownable2Step {
      */
     function withdrawEther() external onlyOwner {
         uint256 amount = address(this).balance;
-        payable(owner()).transfer(amount); // Transfer ether to owner
+        (bool sent,) = payable(owner()).call{value: amount}(""); // Returns false on failure
+        if (!sent) {
+            revert FailedToSendEther();
+        }
         emit WithdrawEther(msg.sender, amount);
     }
 }

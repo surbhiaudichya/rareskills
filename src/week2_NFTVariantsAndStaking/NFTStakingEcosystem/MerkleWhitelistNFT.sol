@@ -28,11 +28,12 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
     error MaxSupplyReached(); // Error when maximum supply of NFTs is reached
     error AlreadyMinted(); // Error when attempting to mint an already minted NFT
     error InvalidMerkleProof(); // Error for invalid Merkle proof
-
+    error FailedToSendEther(); // Error when withdrawEther fail
     /**
      * @dev Constructor to initialize the contract with the Merkle root hash and set default royalty.
      * @param _merkleRoot The Merkle root hash of the whitelist.
      */
+
     constructor(bytes32 _merkleRoot) ERC721("My NFT", "MNFT") Ownable(msg.sender) {
         merkleRoot = _merkleRoot; // Initialize Merkle root hash
         _setDefaultRoyalty(msg.sender, DEFAULT_ROYALTY); // Set default royalty for the owner
@@ -98,7 +99,10 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
      */
     function withdrawEther() external onlyOwner {
         uint256 amount = address(this).balance;
-        payable(owner()).transfer(amount); // Transfer ether to owner
+        (bool sent,) = payable(owner()).call{value: amount}(""); // Returns false on failure
+        if (!sent) {
+            revert FailedToSendEther();
+        }
         emit WithdrawEther(msg.sender, amount);
     }
 }

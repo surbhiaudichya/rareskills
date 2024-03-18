@@ -68,7 +68,7 @@ contract StakingContract is IERC721Receiver {
             revert NFTContractOnly();
         }
         // Update the accumulated reward
-        UpdateReward();
+        updateReward();
         uint256 _accRewardPerToken = accRewardPerToken;
         //Use storage pointers instead of memory
         User storage _users = users[from];
@@ -99,7 +99,7 @@ contract StakingContract is IERC721Receiver {
             revert IncorrectOwner();
         }
         // Update the accumulated reward
-        UpdateReward();
+        updateReward();
         //Use storage pointers instead of memory
         User storage _users = users[msg.sender];
         uint256 _accRewardPerToken = accRewardPerToken;
@@ -124,7 +124,7 @@ contract StakingContract is IERC721Receiver {
      * @notice Updates the accumulated reward per token
      * @dev This function calculates the accumulated reward per token based on the time elapsed since the last update
      */
-    function UpdateReward() internal {
+    function updateReward() internal {
         uint256 _lastRewardTimestamp = lastRewardTimestamp;
         if (block.timestamp > _lastRewardTimestamp) {
             if (_lastRewardTimestamp > 0) {
