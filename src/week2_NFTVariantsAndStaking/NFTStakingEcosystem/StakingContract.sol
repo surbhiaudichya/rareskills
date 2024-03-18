@@ -70,12 +70,14 @@ contract StakingContract is IERC721Receiver {
         // Update the accumulated reward
         UpdateReward();
         uint256 _accRewardPerToken = accRewardPerToken;
-        uint256 _userTotalBalance = users[from].totalBalance;
+        //Use storage pointers instead of memory
+        User storage _users = users[from];
+        uint256 _userTotalBalance = _users.totalBalance;
         // Calculate the reward to be minted
-        uint256 rewardToMint = _userTotalBalance * _accRewardPerToken - users[from].debt;
+        uint256 rewardToMint = _userTotalBalance * _accRewardPerToken - _users.debt;
         // Update the user's balance and debt
-        users[from].totalBalance = _userTotalBalance + 1;
-        users[from].debt = users[from].totalBalance * _accRewardPerToken;
+        _users.totalBalance = _userTotalBalance + 1;
+        _users.debt = _users.totalBalance * _accRewardPerToken;
         // Mint the reward tokens and emit an event
         if (rewardToMint > 0) rewardToken.mint(from, rewardToMint);
         emit RewardsClaimed(from, rewardToMint);
@@ -98,16 +100,18 @@ contract StakingContract is IERC721Receiver {
         }
         // Update the accumulated reward
         UpdateReward();
+        //Use storage pointers instead of memory
+        User storage _users = users[msg.sender];
         uint256 _accRewardPerToken = accRewardPerToken;
-        uint256 _userTotalBalance = users[msg.sender].totalBalance;
+        uint256 _userTotalBalance = _users.totalBalance;
         // Calculate the reward to be minted
-        uint256 rewardToMint = _userTotalBalance * _accRewardPerToken - users[msg.sender].debt;
+        uint256 rewardToMint = _userTotalBalance * _accRewardPerToken - _users.debt;
         // Mint the reward tokens and emit an event
         rewardToken.mint(msg.sender, rewardToMint);
         emit RewardsClaimed(msg.sender, rewardToMint);
         // Update the user's balance and debt
-        users[msg.sender].totalBalance = _userTotalBalance - 1;
-        users[msg.sender].debt = users[msg.sender].totalBalance * _accRewardPerToken;
+        _users.totalBalance = _userTotalBalance - 1;
+        _users.debt = _users.totalBalance * _accRewardPerToken;
         // Delete the stake
         delete stakes[tokenId];
         // Transfer the NFT back to the owner
