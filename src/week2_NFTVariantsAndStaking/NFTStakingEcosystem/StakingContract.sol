@@ -69,22 +69,20 @@ contract StakingContract is IERC721Receiver {
         }
         // Update the accumulated reward
         UpdateReward();
-
+        uint256 _accRewardPerToken = accRewardPerToken;
+        uint256 _userTotalBalance = users[from].totalBalance;
         // Calculate the reward to be minted
-        uint256 rewardToMint = users[from].totalBalance * accRewardPerToken - users[from].debt;
-
+        uint256 rewardToMint = _userTotalBalance * _accRewardPerToken - users[from].debt;
         // Update the user's balance and debt
-        users[from].totalBalance += 1;
-        users[from].debt = users[from].totalBalance * accRewardPerToken;
-
+        users[from].totalBalance = _userTotalBalance + 1;
+        users[from].debt = users[from].totalBalance * _accRewardPerToken;
         // Mint the reward tokens and emit an event
-        if (rewardToMint > 0) RewardToken(rewardToken).mint(from, rewardToMint);
+        if (rewardToMint > 0) rewardToken.mint(from, rewardToMint);
         emit RewardsClaimed(from, rewardToMint);
         // Record the stake
         stakes[tokenId] = from;
         // Emit an event for the deposit
         emit NFTDeposited(from, tokenId);
-
         return IERC721Receiver.onERC721Received.selector;
     }
 
@@ -98,27 +96,22 @@ contract StakingContract is IERC721Receiver {
         if (msg.sender != stakes[tokenId]) {
             revert IncorrectOwner();
         }
-
         // Update the accumulated reward
         UpdateReward();
-
+        uint256 _accRewardPerToken = accRewardPerToken;
+        uint256 _userTotalBalance = users[msg.sender].totalBalance;
         // Calculate the reward to be minted
-        uint256 rewardToMint = users[msg.sender].totalBalance * accRewardPerToken - users[msg.sender].debt;
-
+        uint256 rewardToMint = _userTotalBalance * _accRewardPerToken - users[msg.sender].debt;
         // Mint the reward tokens and emit an event
-        RewardToken(rewardToken).mint(msg.sender, rewardToMint);
+        rewardToken.mint(msg.sender, rewardToMint);
         emit RewardsClaimed(msg.sender, rewardToMint);
-
         // Update the user's balance and debt
-        users[msg.sender].totalBalance -= 1;
-        users[msg.sender].debt = users[msg.sender].totalBalance * accRewardPerToken;
-
+        users[msg.sender].totalBalance = _userTotalBalance - 1;
+        users[msg.sender].debt = users[msg.sender].totalBalance * _accRewardPerToken;
         // Delete the stake
         delete stakes[tokenId];
-
         // Transfer the NFT back to the owner
         ERC721(nft).safeTransferFrom(address(this), msg.sender, tokenId);
-
         // Emit an event for the withdrawal
         emit NFTWithdrawn(msg.sender, tokenId);
     }
@@ -128,17 +121,15 @@ contract StakingContract is IERC721Receiver {
      * @dev This function calculates the accumulated reward per token based on the time elapsed since the last update
      */
     function UpdateReward() internal {
-        if (block.timestamp > lastRewardTimestamp) {
-            if (lastRewardTimestamp > 0) {
-                uint256 timeSinceLastReward = block.timestamp - lastRewardTimestamp;
-
+        uint256 _lastRewardTimestamp = lastRewardTimestamp;
+        if (block.timestamp > _lastRewardTimestamp) {
+            if (_lastRewardTimestamp > 0) {
+                uint256 timeSinceLastReward = block.timestamp - _lastRewardTimestamp;
                 // Calculate the reward accumulated since the last update
                 uint256 rewardAccumulated = (rewardPer24Hours * timeSinceLastReward) / perDay;
-
                 // Update the accumulated reward per token
                 accRewardPerToken += rewardAccumulated;
             }
-
             // Update the last reward timestamp
             lastRewardTimestamp = block.timestamp;
         }
