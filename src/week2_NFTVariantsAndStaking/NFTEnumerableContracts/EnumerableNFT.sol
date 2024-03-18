@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.6.0 <0.9.0;
+pragma solidity 0.8.21;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -56,7 +56,7 @@ contract EnumerableNFT is ERC721Enumerable, Ownable2Step {
      */
     function withdrawEther() external onlyOwner {
         uint256 amount = address(this).balance;
-        payable(owner()).transfer(address(this).balance); // Transfer ether to owner
+        payable(owner()).transfer(amount); // Transfer ether to owner
         emit WithdrawEther(msg.sender, amount);
     }
 }

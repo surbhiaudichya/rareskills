@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity >= 0.6.0 < 0.9.0;
+pragma solidity 0.8.21;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
@@ -55,29 +54,25 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
      * @param index The index of the address in the Merkle tree.
      */
     function whitelistMint(bytes32[] memory _merkleProof, uint256 _tokenId, uint256 index) external payable {
-        if (totalSupply >= MAX_SUPPLY) {
+        uint256 _totalSupply = totalSupply;
+        if (_totalSupply >= MAX_SUPPLY) {
             revert MaxSupplyReached(); // Ensure maximum supply not reached
         }
         if (BitMaps.get(_bitmap, index)) {
             revert AlreadyMinted(); // Ensure address not already minted
         }
-
         if (msg.value < WHITELIST_MINT_PRICE) {
             revert InsufficientEther(); // Ensure correct amount of ether sent
         }
-
         // Verify the provided _merkleProof
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender, index))));
-
         if (!MerkleProof.verify(_merkleProof, merkleRoot, leaf)) {
             revert InvalidMerkleProof(); // Ensure valid Merkle proof
         }
-
         // Mint the NFT
         BitMaps.set(_bitmap, index); // Mark address as minted
-        totalSupply++; // Increment total supply
+        totalSupply = _totalSupply + 1; // Increment total supply
         _safeMint(msg.sender, _tokenId); // Mint the NFT
-
         emit Minted(msg.sender, _tokenId); // Emit Minted event
     }
 
@@ -86,18 +81,15 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
      * @param _tokenId The ID of the token to mint.
      */
     function mint(uint256 _tokenId) external payable {
-        if (totalSupply >= MAX_SUPPLY) {
+        uint256 _totalSupply = totalSupply;
+        if (_totalSupply >= MAX_SUPPLY) {
             revert MaxSupplyReached(); // Ensure maximum supply not reached
         }
-
         if (msg.value < MINT_PRICE) {
             revert InsufficientEther(); // Ensure correct amount of ether sent
         }
-
-        totalSupply++; // Increment total supply
-
+        totalSupply = _totalSupply + 1; // Increment total supply
         _safeMint(msg.sender, _tokenId); // Mint the NFT
-
         emit Minted(msg.sender, _tokenId); // Emit Minted event
     }
 
@@ -106,7 +98,7 @@ contract MerkleWhitelistNFT is ERC721, ERC2981, Ownable2Step {
      */
     function withdrawEther() external onlyOwner {
         uint256 amount = address(this).balance;
-        payable(owner()).transfer(address(this).balance); // Transfer ether to owner
+        payable(owner()).transfer(amount); // Transfer ether to owner
         emit WithdrawEther(msg.sender, amount);
     }
 }
