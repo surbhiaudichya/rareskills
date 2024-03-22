@@ -5,6 +5,7 @@ libs = ["lib"]
 remappings = [
     "@openzeppelin/contracts=lib/openzeppelin-contracts/contracts",
     "@openzeppelin/merkle-tree=lib/merkle-tree",
+    "solady/=lib/solady",
 ]
 
 gas_reports = ["*"]
