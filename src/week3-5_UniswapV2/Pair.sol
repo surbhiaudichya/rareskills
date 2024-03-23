@@ -7,17 +7,17 @@ import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
 import {PairERC20} from "./PairERC20.sol";
+import {IFactory} from "./interface/IFactory.sol";
 
 contract Pair is PairERC20, ReentrancyGuard {
     address public factory;
     address public token0;
     address public token1;
-
+    uint256 public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
+    uint256 public immutable MINIMUM_LIQUIDITY = 10 ** 3;
     uint112 private reserve0;
     uint112 private reserve1;
     uint32 private blockTimestampLast;
-
-    uint256 public immutable MINIMUM_LIQUIDITY = 10 ** 3;
 
     //Event
     event Mint(address indexed sender, uint256 amount0, uint256 amount1);
@@ -63,7 +63,8 @@ contract Pair is PairERC20, ReentrancyGuard {
         uint256 balance1 = IERC20(_token1).balanceOf(address(this));
         //liquidity is measured by the amount of LP tokens owned by the pool contract.
         uint256 liquidity = balanceOf(address(this));
-
+        // Measurs the growth of fees due to swaps between liquidity deposit and withdrawal events.
+        bool feeOn = _mintFee(_reserve0, _reserve1);
         uint256 _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
         //Calculate the amounts that the LP provider will get back.
         amount0 = (liquidity * balance0) / _totalSupply; // using balances ensures pro-rata distribution
@@ -82,7 +83,7 @@ contract Pair is PairERC20, ReentrancyGuard {
         balance1 = IERC20(_token1).balanceOf(address(this));
         // Update reserve
         _update(balance0, balance1, _reserve0, _reserve1);
-
+        if (feeOn) kLast = uint256(reserve0) * uint256(reserve1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
@@ -95,7 +96,8 @@ contract Pair is PairERC20, ReentrancyGuard {
         //Calculate the amount of tokens user has sent.
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-
+        // Measurs the growth of fees due to swaps between liquidity deposit and withdrawal events.
+        bool feeOn = _mintFee(_reserve0, _reserve1);
         uint256 _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
 
         // Check: totalSupply of liquidity token.
@@ -118,7 +120,8 @@ contract Pair is PairERC20, ReentrancyGuard {
 
         // Update reserves.
         _update(balance0, balance1, _reserve0, _reserve1);
-
+        // Set kLast to current liquidity
+        if (feeOn) kLast = uint256(reserve0) * uint256(reserve1);
         emit Mint(msg.sender, amount0, amount1);
     }
 
@@ -176,6 +179,33 @@ contract Pair is PairERC20, ReentrancyGuard {
         _reserve0 = reserve0;
         _reserve1 = reserve1;
         _blockTimestampLast = blockTimestampLast;
+    }
+
+    function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
+        address feeTo = IFactory(factory).feeTo();
+        feeOn = feeTo != address(0);
+        uint256 _kLast = kLast; // gas savings
+        // Check: feeOn is not zero address
+        if (feeOn) {
+            if (_kLast != 0) {
+                //current liquidity after fees
+                uint256 rootK = FixedPointMathLib.sqrt(uint256(_reserve0) * (_reserve1));
+                // previous liquidity
+                uint256 rootKLast = FixedPointMathLib.sqrt(_kLast);
+                // Check current liquidity is greater than previous liquidity
+                if (rootK > rootKLast) {
+                    // 0.005% of swap fees
+                    // protocolFee = ((currentLiquidity - previousLiquidity) / (5 * currentLiquidity - previousLiquidity)) * totalSupply
+                    uint256 numerator = totalSupply() * (rootK - rootKLast);
+                    uint256 denominator = (rootK * 5) + rootKLast;
+                    uint256 liquidity = numerator / denominator;
+                    // mint protocolFee
+                    if (liquidity > 0) _mint(feeTo, liquidity);
+                }
+            }
+        } else if (_kLast != 0) {
+            kLast = 0;
+        }
     }
 
     function _update(uint256 balance0, uint256 balance1, uint112 _reserve0, uint112 _reserve1) private {
