@@ -18,14 +18,14 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
     address public token0;
     address public token1;
     uint256 public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
-    uint256 public immutable MINIMUM_LIQUIDITY = 10 ** 3;
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
+    uint256 public immutable MINIMUM_LIQUIDITY = 10 ** 3;
+
     uint112 private reserve0;
     uint112 private reserve1;
     uint32 private blockTimestampLast;
 
-    //Event
     event Mint(address indexed sender, uint256 amount0, uint256 amount1);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(address indexed sender, uint256 amountIn, uint256 amountOut, address indexed to);
@@ -41,36 +41,100 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
     error InsufficientLiquidityMinted();
     error InsufficientLiquidityBurned();
     error TradeSlippage();
-    error FlashLoanFailed();
+    error FlashLenderCallbackFailed();
+    error UnsupportedToken();
+    error OnlyFactory();
 
+    // Constructor to set the factory address
     constructor() {
         factory = msg.sender;
     }
 
+    /**
+     * @notice Initializes the pair with the given tokens
+     * @param _token0 Address of token0
+     * @param _token1 Address of token1
+     */
     function initialize(address _token0, address _token1) external {
-        require(msg.sender == factory, "UniswapV2: FORBIDDEN"); // sufficient check
+        if (msg.sender != factory) {
+            revert OnlyFactory();
+        }
         token0 = _token0;
         token1 = _token1;
     }
-    /**
-     * @notice IERC3156FlashLender-{maxFlashLoan}
-     * @param token address of token to borrow
-     * @return amount maximum that user can borrow
-     */
-
-    function maxFlashLoan(address token) public view override returns (uint256 amount) {
-        // if (token != token0 && token != token1) revert UnsupportedToken();
-        // amount = token == token0 ? _reserve0 : _reserve1;
-    }
 
     /**
-     * @param token address of token to borrow
-     * @param amount amount of the token to borrow
-     * @return fee for flashloan
+     * @notice Adds liquidity to the pair
+     * @param amount0Min Minimum amount of token0 to deposit
+     * @param amount1Min Minimum amount of token1 to deposit
+     * @param to Address to send the LP tokens to
+     * @return liquidity The amount of liquidity tokens minted
      */
-    function flashFee(address token, uint256 amount) public view override returns (uint256 fee) {
-        // if (token != token0 && token != token1) revert UnsupportedToken();
-        // fee = (amount * FEE_BPS) / 10_000;
+    function addLiquidity(uint256 amount0Min, uint256 amount1Min, address to)
+        external
+        nonReentrant
+        returns (uint256 liquidity)
+    {
+        (uint112 _reserve0, uint112 _reserve1,) = getReserves();
+        // Get the actual balance of token0 and token1
+        uint256 balance0 = IERC20(token0).balanceOf(address(this));
+        uint256 balance1 = IERC20(token1).balanceOf(address(this));
+        // Calculate the desired amounts of token0 and token1
+        uint256 amount0Desired = balance0 - _reserve0;
+        uint256 amount1Desired = balance1 - _reserve1;
+        // Actual deposit amount
+        uint256 amount0;
+        uint256 amount1;
+        // Return token amount if any
+        uint256 amount0Return;
+        uint256 amount1Return;
+        // Measurs the growth of fees due to swaps between liquidity deposit and withdrawal events.
+        bool feeOn = _mintFee(_reserve0, _reserve1);
+        // Must be defined here since totalSupply can update in _mintFee
+        uint256 _totalSupply = totalSupply();
+
+        // If there are no LP tokens yet, mint the initial amount and lock the first MINIMUM_LIQUIDITY tokens
+        if (_totalSupply == 0) {
+            // Initially mints shares equal to the geometric mean of the amounts
+            liquidity = FixedPointMathLib.sqrt(amount0Desired * amount1Desired) - (MINIMUM_LIQUIDITY);
+            // Burn first MINIMUM_LIQUIDITY tokens to ensure no-one owns the entire supply of LP tokens
+            _mint(address(0), MINIMUM_LIQUIDITY);
+        } else {
+            // Calculate the optimal amount of token1 to be added
+            uint256 amount1Optimal = quote(amount0Desired, reserve0, reserve1);
+            // Calculate the optimal amount of token0 to be added
+            uint256 amount0Optimal = quote(amount1Desired, reserve1, reserve0);
+            if (amount1Optimal <= amount1Desired) {
+                amount0 = amount0Desired;
+                amount1 = amount1Optimal;
+                amount1Return = amount1Desired - amount1Optimal;
+            } else if (amount0Optimal <= amount0Desired) {
+                amount0 = amount0Optimal;
+                amount1 = amount1Desired;
+                amount0Return = amount0Desired - amount0Optimal;
+            }
+            // Calculate the amount of liquidity tokens to be minted
+            liquidity =
+                FixedPointMathLib.min((amount0 * _totalSupply) / _reserve0, (amount1 * _totalSupply) / _reserve1);
+        }
+        if (amount0 <= amount0Min && amount1 <= amount1Min) {
+            revert TradeSlippage();
+        }
+        // Chech: liquidty amount is greater than Zero.
+        if (liquidity <= 0) {
+            revert InsufficientLiquidityMinted();
+        }
+        // Mint liquidity token to LP.
+        _mint(to, liquidity);
+
+        // Update the reserves and the price
+        _update(balance0 - amount0Return, balance1 - amount1Return, _reserve0, _reserve1);
+        // Update kLast if fee is enabled
+        if (feeOn) kLast = uint256(reserve0) * uint256(reserve1);
+        // Transfer remaining token amount if any
+        if (amount0Return > 0) SafeTransferLib.safeTransfer(token0, to, amount0Return);
+        if (amount1Return > 0) SafeTransferLib.safeTransfer(token1, to, amount1Return);
+        emit Mint(msg.sender, amount0, amount1);
     }
 
     /**
@@ -81,119 +145,108 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
         override
         returns (bool)
     {
-        if (token != token0 && token != token1) revert();
+        // Ensure that the token being borrowed is one of the pair tokens
+        if (token != token0 && token != token1) revert UnsupportedToken();
+        // Check if the contract has sufficient liquidity to lend
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (amount > balance) {
-            revert();
+            revert InsufficientLiquidity();
         }
+        // Get the current reserves before the flash loan
         (uint112 _reserve0, uint112 _reserve1,) = getReserves();
+        // Transfer the borrowed tokens to the receiver
         SafeTransferLib.safeTransfer(token, address(receiver), amount);
-
+        // Calculate the fee for the flash loan
         uint256 fee;
         unchecked {
             fee = (amount * 3) / 1000;
         }
+        // Invoke the receiver's callback function and ensure its validity
         if (receiver.onFlashLoan(msg.sender, token, amount, fee, data) != keccak256("ERC3156FlashBorrower.onFlashLoan"))
         {
-            revert FlashLoanFailed();
+            revert FlashLenderCallbackFailed();
         }
-
+        // Transfer the borrowed tokens plus the fee back to the contract
         SafeTransferLib.safeTransferFrom(token, address(receiver), address(this), amount + fee);
-
-        // Get actual reserve balance, including any donations
+        // Update the reserves after the flash loan transaction
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
         _update(balance0, balance1, _reserve0, _reserve1);
         return true;
     }
 
-    //It is assumed that the burner sent in LP tokens before calling burn
-    function burn(address to) external nonReentrant returns (uint256 amount0, uint256 amount1) {
-        // Get reserve balance
+    /**
+     * @notice Removes liquidity from the pair
+     * @param amount0Min Minimum amount of token0 to receive
+     * @param amount1Min Minimum amount of token1 to receive
+     * @param to Address to send the tokens to
+     * @return amount0 The amounts of token0 withdrawn
+     * @return amount1 The amounts of token0 withdrawn
+     */
+    function removeLiquidity(uint256 amount0Min, uint256 amount1Min, address to)
+        external
+        nonReentrant
+        returns (uint256 amount0, uint256 amount1)
+    {
+        // Get the reserves of token0 and token1
         (uint112 _reserve0, uint112 _reserve1,) = getReserves();
         address _token0 = token0;
         address _token1 = token1;
-        // Get actual reserve balance, including any donations
+        // Get the actual balance of token0 and token1
         uint256 balance0 = IERC20(_token0).balanceOf(address(this));
         uint256 balance1 = IERC20(_token1).balanceOf(address(this));
-        //liquidity is measured by the amount of LP tokens owned by the pool contract.
+        // Get the liquidity amount
         uint256 liquidity = balanceOf(address(this));
         // Measurs the growth of fees due to swaps between liquidity deposit and withdrawal events.
         bool feeOn = _mintFee(_reserve0, _reserve1);
-        uint256 _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
-        //Calculate the amounts that the LP provider will get back.
+        uint256 _totalSupply = totalSupply(); // must be defined here since totalSupply can update in _mintFee
+        // Calculate the amounts of token0 and token1 to be withdrawn based on the provided liquidity
         amount0 = (liquidity * balance0) / _totalSupply; // using balances ensures pro-rata distribution
         amount1 = (liquidity * balance1) / _totalSupply; // using balances ensures pro-rata distribution
         // Check: The token amount are greater than zero.
-        if (amount0 <= 0 && amount1 <= 0) {
-            revert InsufficientLiquidityBurned();
+        if (amount0 < amount0Min && amount1 < amount1Min) {
+            revert TradeSlippage();
         }
         // Burn LP Token
         _burn(address(this), liquidity);
-        // The token0 and token1 are sent to the liquidity provider.
+        // Transfer the withdrawn tokens to the recipient
         SafeTransferLib.safeTransfer(_token0, to, amount0);
         SafeTransferLib.safeTransfer(_token1, to, amount1);
         // Get new reserve balance.
         balance0 = IERC20(_token0).balanceOf(address(this));
         balance1 = IERC20(_token1).balanceOf(address(this));
-        // Update reserve
+        // Update the reserves
         _update(balance0, balance1, _reserve0, _reserve1);
         if (feeOn) kLast = uint256(reserve0) * uint256(reserve1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function mint(address to) external nonReentrant returns (uint256 liquidity) {
-        // get reserve balance
-        (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
-        // Actual token0 and token1 amount
-        uint256 balance0 = IERC20(token0).balanceOf(address(this));
-        uint256 balance1 = IERC20(token1).balanceOf(address(this));
-        //Calculate the amount of tokens user has sent.
-        uint256 amount0 = balance0 - _reserve0;
-        uint256 amount1 = balance1 - _reserve1;
-        // Measurs the growth of fees due to swaps between liquidity deposit and withdrawal events.
-        bool feeOn = _mintFee(_reserve0, _reserve1);
-        uint256 _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
-
-        // Check: totalSupply of liquidity token.
-        if (_totalSupply == 0) {
-            // Initially mints shares equal to the geometric mean of the amounts
-            liquidity = FixedPointMathLib.sqrt(amount0 * amount1) - (MINIMUM_LIQUIDITY);
-            // burn first MINIMUM_LIQUIDITY tokens to ensure no-one owns the entire supply of LP tokens
-            _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
-        } else {
-            // LP will get the worse of the two ratios, this is to incentivise to supply liquidity without chaning the token ratio.
-            liquidity =
-                FixedPointMathLib.min((amount0 * _totalSupply) / _reserve0, (amount1 * _totalSupply) / _reserve1);
-        }
-        // Chech: liquidty amount is greater than Zero.
-        if (liquidity <= 0) {
-            revert InsufficientLiquidityMinted();
-        }
-        // Mint liquidity token to LP.
-        _mint(to, liquidity);
-
-        // Update reserves and the new price and how long the previous price lasted.
-        _update(balance0, balance1, _reserve0, _reserve1);
-        // Set kLast to current liquidity
-        if (feeOn) kLast = uint256(reserve0) * uint256(reserve1);
-        emit Mint(msg.sender, amount0, amount1);
-    }
-
+    /**
+     * @notice Swaps tokens in the pair
+     * @param amountOutMin Minimum amount of tokens to receive
+     * @param tokenOut Address of the token to receive
+     * @param to Address to send the swapped tokens to
+     */
     function swap(uint256 amountOutMin, address tokenOut, address to) external nonReentrant {
-        // Check: amount0Out and amount1Out are equal or greater than zero.
+        // Check: Ensure that the minimum amount to receive is non-zero
         if (amountOutMin == 0) {
             revert InsufficientOutputAmount();
         }
-        // Check: To is not token address.
+
+        // Check: Ensure that the destination address is not one of the tokens
         if (to == token0 && to == token1) {
             revert InvalidTo();
         }
+
+        // Check: Ensure that the token to receive is one of the pair tokens
         if (tokenOut != token0 && tokenOut != token1) {
-            revert();
+            revert UnsupportedToken();
         }
-        //_reserve0 and _reserve1 reflect the balance of the contract before the tokens were sent.
+
+        // Get the reserves of token0 and token1
         (uint112 _reserve0, uint112 _reserve1,) = getReserves();
+
+        // Determine which token is being swapped out and which one is being received
         uint112 reserveTokenIn;
         uint112 reserveTokenOut;
         address tokenIn;
@@ -207,34 +260,36 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
             reserveTokenOut = _reserve0;
         }
 
+        // Check: Ensure that there is enough liquidity for the swap
         if (amountOutMin > reserveTokenOut) revert InsufficientLiquidity();
 
-        // it is expected that user must have sent the tokenIn
+        // Get the balance of the input token before the swap
         uint256 balanceTokenIn = IERC20(tokenIn).balanceOf(address(this));
 
+        // Calculate the input amount for the swap
         uint256 amountTokenIn;
-
-        //amount0In and amount1In will reflect the net gain if there was a net gain for the token, and they will be zero if there was a net loss of that token.
         unchecked {
             amountTokenIn = balanceTokenIn > reserveTokenIn ? balanceTokenIn - reserveTokenIn : 0;
         }
 
-        //Check: values aren’t zero
+        //Check: Ensure that the input amount is non-zero
         if (amountTokenIn == 0) {
             revert InsufficientInputAmount();
         }
-        // Formula amountOut = reserveTokenOut * amountTokenIn / reserveTokenIn + amountTokenIn
+
+        // Calculate amountOut = reserveTokenOut * amountTokenIn / reserveTokenIn + amountTokenIn
         uint256 amountInWithFee = amountTokenIn * 997;
         uint256 numerator = amountInWithFee * reserveTokenOut;
         uint256 denominator = reserveTokenIn * 1000 + amountInWithFee;
-        // reserve0 * reserve1 <  balanceTokenIn * (balanceTokenOut - actualAmountOut)
         uint256 actualAmountOut = numerator / denominator;
+
+        // Ensure that the actual amount out meets the minimum requirement
         if (actualAmountOut < amountOutMin) revert TradeSlippage();
 
-        // Transfers out the amount of tokens that the trader requested.
+        // Transfer the output tokens to the recipient
         SafeTransferLib.safeTransfer(token0, to, actualAmountOut);
 
-        // Updating Reserves and the new price and how long the previous price lasted.
+        // Update the reserves and the price.
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
         _update(balance0, balance1, _reserve0, _reserve1);
@@ -246,10 +301,36 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
 
+    /**
+     * @notice IERC3156FlashLender-{maxFlashLoan}
+     * @param token address of token to borrow
+     * @return amount maximum that user can borrow
+     */
+    function maxFlashLoan(address token) public view override returns (uint256 amount) {
+        if (token != token0 && token != token1) revert UnsupportedToken();
+        amount = token == token0 ? reserve0 : reserve1;
+    }
+
+    /**
+     * @param token address of token to borrow
+     * @param amount amount of the token to borrow
+     * @return fee for flashloan
+     */
+    function flashFee(address token, uint256 amount) public view override returns (uint256 fee) {
+        if (token != token0 && token != token1) revert UnsupportedToken();
+        fee = (amount * 3) / 1000;
+    }
+
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
         _reserve0 = reserve0;
         _reserve1 = reserve1;
         _blockTimestampLast = blockTimestampLast;
+    }
+
+    function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) internal pure returns (uint256 amountB) {
+        if (amountA < 0) revert();
+        if (reserveA < 0 && reserveB < 0) revert();
+        amountB = (amountA * reserveA) / reserveB;
     }
 
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
@@ -259,14 +340,14 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
         // Check: feeOn is not zero address
         if (feeOn) {
             if (_kLast != 0) {
-                //current liquidity after fees
+                // Current liquidity after fees
                 uint256 rootK = FixedPointMathLib.sqrt(uint256(_reserve0) * (_reserve1));
-                // previous liquidity
+                // Previous liquidity
                 uint256 rootKLast = FixedPointMathLib.sqrt(_kLast);
                 // Check current liquidity is greater than previous liquidity
                 if (rootK > rootKLast) {
                     // 0.005% of swap fees
-                    // protocolFee = ((currentLiquidity - previousLiquidity) / (5 * currentLiquidity - previousLiquidity)) * totalSupply
+                    // Formula: protocolFee = ((currentLiquidity - previousLiquidity) / (5 * currentLiquidity - previousLiquidity)) * totalSupply
                     uint256 numerator = totalSupply() * (rootK - rootKLast);
                     uint256 denominator = (rootK * 5) + rootKLast;
                     uint256 liquidity = numerator / denominator;
