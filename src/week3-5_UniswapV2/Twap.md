@@ -1,6 +1,7 @@
 ### Why does `price0CumulativeLast` and `price1CumulativeLast` never decrement?
 
-The variables `price0CumulativeLast` and `price1CumulativeLast` in Uniswap V2 accumulate the cumulative prices since the pool's launch. They are updated with every call to the `_update` function and can only increase until they overflow. There's no mechanism to make them decrease, as they always accumulate prices over time. This design ensures that the oracle continually provides updated price information without the possibility of decrementing.
+The variables `price0CumulativeLast` and `price1CumulativeLast` in Uniswap V2 accumulate the cumulative prices since the pool's launch. They are updated with every call to the `_update` function and can only increase until they overflow for Solidity 0.8.0 onwards we need to use uncheck. There's no mechanism to make them decrease, as they always accumulate prices over time. This design ensures that the oracle continually provides updated price information without the possibility of decrementing. Eventually, When Price will overlflow the prvious reserve will be higher than the new  reserve. When the oracle compute the change in price, it will get a negative value, However, this won’t matter due to the rules of modular arithmetic. E.g. Imaginary unsigned integers that overflow at 100.
+We snapshot the priceAccumulator at 80 and a few transactions/blocks later the priceAccumulator goes to 110, but it overflows to 10. We subtract 80 from 10, which gives -70. But the value is stored as an unsigned integer, so it gives -70 mod(100) which is 30. That’s the same result we would expect if it didn’t overflow (110-80=30).
 
 ### How do you write a contract that uses the Oracle?
 
@@ -46,5 +47,3 @@ contract UniswapOracle {
 ### Why are `price0CumulativeLast` and `price1CumulativeLast` stored separately? Why not just calculate `price1CumulativeLast = 1/price0CumulativeLast`?
 
 The prices of assets in a Uniswap V2 pair are stored separately as `price0CumulativeLast` and `price1CumulativeLast` because they represent the cumulative prices of each asset in the pair. While it's true that the price of one asset relative to the other can be calculated by taking the inverse, storing them separately allows for more efficient and precise calculations within the Uniswap protocol. Additionally, storing them separately ensures symmetry in the representation of prices, maintaining consistency in the fixed-point arithmetic used by Uniswap V2.
-
-If you have any further questions or need clarification on any of these points, feel free to ask!

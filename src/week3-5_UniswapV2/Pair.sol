@@ -7,14 +7,15 @@ import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
 import {PairERC20} from "./PairERC20.sol";
-import {IFactory} from "./interface/IFactory.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
 import {UQ112x112} from "./UQ112x112.sol";
 import {IERC3156FlashBorrower, IERC3156FlashLender} from "@openzeppelin/contracts/interfaces/IERC3156FlashLender.sol";
 
 contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
     using UQ112x112 for uint224;
 
-    address public factory;
+    /// STATE VARS ///
+    address public factoryAddress;
     address public token0;
     address public token1;
     uint256 public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
@@ -26,12 +27,13 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
     uint112 private reserve1;
     uint32 private blockTimestampLast;
 
+    /// EVENTS ///
     event Mint(address indexed sender, uint256 amount0, uint256 amount1);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(address indexed sender, uint256 amountIn, uint256 amountOut, address indexed to);
     event Sync(uint112 reserve0, uint112 reserve1);
 
-    //Error
+    /// CUSTOM ERRORS ///
     error InsufficientOutputAmount();
     error InsufficientLiquidity();
     error InvalidTo();
@@ -47,29 +49,27 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
 
     // Constructor to set the factory address
     constructor() {
-        factory = msg.sender;
+        factoryAddress = msg.sender;
     }
 
-    /**
-     * @notice Initializes the pair with the given tokens
-     * @param _token0 Address of token0
-     * @param _token1 Address of token1
-     */
+    /// NON-CONSTANT FUNCTIONS ///
+
+    /// @notice Initializes the pair with the given tokens
+    /// @param _token0 Address of token0
+    /// @param _token1 Address of token1
     function initialize(address _token0, address _token1) external {
-        if (msg.sender != factory) {
+        if (msg.sender != factoryAddress) {
             revert OnlyFactory();
         }
         token0 = _token0;
         token1 = _token1;
     }
 
-    /**
-     * @notice Adds liquidity to the pair
-     * @param amount0Min Minimum amount of token0 to deposit
-     * @param amount1Min Minimum amount of token1 to deposit
-     * @param to Address to send the LP tokens to
-     * @return liquidity The amount of liquidity tokens minted
-     */
+    /// @notice Adds liquidity to the pair
+    /// @param amount0Min Minimum amount of token0 to deposit
+    /// @param amount1Min Minimum amount of token1 to deposit
+    /// @param to Address to send the LP tokens to
+    /// @return liquidity The amount of liquidity tokens minted
     function addLiquidity(uint256 amount0Min, uint256 amount1Min, address to)
         external
         nonReentrant
@@ -137,9 +137,7 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
         emit Mint(msg.sender, amount0, amount1);
     }
 
-    /**
-     * @notice IERC3156FlashLender-{flashLoan}
-     */
+    /// @notice IERC3156FlashLender-{flashLoan}
     function flashLoan(IERC3156FlashBorrower receiver, address token, uint256 amount, bytes calldata data)
         public
         override
@@ -175,14 +173,12 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
         return true;
     }
 
-    /**
-     * @notice Removes liquidity from the pair
-     * @param amount0Min Minimum amount of token0 to receive
-     * @param amount1Min Minimum amount of token1 to receive
-     * @param to Address to send the tokens to
-     * @return amount0 The amounts of token0 withdrawn
-     * @return amount1 The amounts of token0 withdrawn
-     */
+    /// @notice Removes liquidity from the pair
+    /// @param amount0Min Minimum amount of token0 to receive
+    /// @param amount1Min Minimum amount of token1 to receive
+    /// @param to Address to send the tokens to
+    /// @return amount0 The amounts of token0 withdrawn
+    /// @return amount1 The amounts of token0 withdrawn
     function removeLiquidity(uint256 amount0Min, uint256 amount1Min, address to)
         external
         nonReentrant
@@ -221,12 +217,10 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    /**
-     * @notice Swaps tokens in the pair
-     * @param amountOutMin Minimum amount of tokens to receive
-     * @param tokenOut Address of the token to receive
-     * @param to Address to send the swapped tokens to
-     */
+    /// @notice Swaps tokens in the pair
+    /// @param amountOutMin Minimum amount of tokens to receive
+    /// @param tokenOut Address of the token to receive
+    /// @param to Address to send the swapped tokens to
     function swap(uint256 amountOutMin, address tokenOut, address to) external nonReentrant {
         // Check: Ensure that the minimum amount to receive is non-zero
         if (amountOutMin == 0) {
@@ -301,26 +295,23 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
 
-    /**
-     * @notice IERC3156FlashLender-{maxFlashLoan}
-     * @param token address of token to borrow
-     * @return amount maximum that user can borrow
-     */
+    /// @notice IERC3156FlashLender-{maxFlashLoan}
+    /// @param token address of token to borrow
+    /// @return amount maximum that user can borrow
     function maxFlashLoan(address token) public view override returns (uint256 amount) {
         if (token != token0 && token != token1) revert UnsupportedToken();
         amount = token == token0 ? reserve0 : reserve1;
     }
 
-    /**
-     * @param token address of token to borrow
-     * @param amount amount of the token to borrow
-     * @return fee for flashloan
-     */
+    /// @param token address of token to borrow
+    /// @param amount amount of the token to borrow
+    /// @return fee for flashloan
     function flashFee(address token, uint256 amount) public view override returns (uint256 fee) {
         if (token != token0 && token != token1) revert UnsupportedToken();
         fee = (amount * 3) / 1000;
     }
 
+    /// @notice Get Reserves
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
         _reserve0 = reserve0;
         _reserve1 = reserve1;
@@ -334,9 +325,9 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
     }
 
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
-        address feeTo = IFactory(factory).feeTo();
+        address feeTo = IFactory(factoryAddress).feeTo();
         feeOn = feeTo != address(0);
-        uint256 _kLast = kLast; // gas savings
+        uint256 _kLast = kLast;
         // Check: feeOn is not zero address
         if (feeOn) {
             if (_kLast != 0) {
