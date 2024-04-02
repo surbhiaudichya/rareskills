@@ -280,7 +280,7 @@ Reference: <https://github.com/crytic/slither/wiki/Detector-Documentation#too-ma
 
 - **Conclusion:**  False Positive.
 
-## Finding 28: State variables that could be declared constant
+## Finding 21: State variables that could be declared constant
 
 PairERC20._name (src/week3-5_UniswapV2/PairERC20.sol#7) should be constant
 PairERC20._symbol (src/week3-5_UniswapV2/PairERC20.sol#8) should be constant
@@ -288,7 +288,7 @@ Reference: <https://github.com/crytic/slither/wiki/Detector-Documentation#state-
 
 - **Conclusion:**  True Positive.
 
-## Finding 29: State variables that could be declared immutable
+## Finding 22: State variables that could be declared immutable
 
 BondingCurve.initialPrice (src/week1_BondingCurves/BondingCurve.sol#27) should be immutable
 BondingCurve.priceChangeRate (src/week1_BondingCurves/BondingCurve.sol#28) should be immutable
