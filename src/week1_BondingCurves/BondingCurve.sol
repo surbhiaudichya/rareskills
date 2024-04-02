@@ -24,8 +24,8 @@ contract BondingCurve is ERC20 {
     event TokenSold(address seller, uint256 amount, uint256 totalPrice);
 
     // Define variables
-    uint256 public initialPrice;
-    uint256 public priceChangeRate;
+    uint256 public immutable initialPrice;
+    uint256 public immutable priceChangeRate;
     uint256 public reserveBalance;
     mapping(address => uint256) public lastBuyTimestamp;
     uint256 public constant cooldownPeriod = 1 days;

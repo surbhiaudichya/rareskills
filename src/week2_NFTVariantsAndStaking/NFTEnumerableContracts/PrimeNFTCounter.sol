@@ -8,7 +8,7 @@ import {IERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions
  * @dev A contract to count the number of NFTs owned by an address with prime token IDs.
  */
 contract PrimeNFTCounter {
-    address public enumerableNft; // Address of the ERC721Enumerable contract
+    address public immutable enumerableNft; // Address of the ERC721Enumerable contract
 
     error ZeroAdress();
 

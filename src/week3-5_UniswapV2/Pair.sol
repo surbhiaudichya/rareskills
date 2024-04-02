@@ -15,7 +15,7 @@ contract Pair is PairERC20, ReentrancyGuard, IERC3156FlashLender {
     using UQ112x112 for uint224;
 
     /// STATE VARS ///
-    address public factoryAddress;
+    address public immutable factoryAddress;
     address public token0;
     address public token1;
     uint256 public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
