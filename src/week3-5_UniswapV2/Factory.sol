@@ -13,11 +13,14 @@ contract Factory {
     event PairCreated(address indexed token0, address indexed token1, address pair, uint256);
 
     error IdenticalAddresses();
-    error ZeroAdress();
+    error ZeroAddress();
     error PairExist();
     error NotAuthorized();
 
     constructor(address _feeToSetter) {
+        if (_feeToSetter == address(0)) {
+            revert ZeroAddress();
+        }
         feeToSetter = _feeToSetter;
     }
 
@@ -27,7 +30,7 @@ contract Factory {
         }
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         if (token0 == address(0)) {
-            revert ZeroAdress();
+            revert ZeroAddress();
         }
         if (getPair[token0][token1] != address(0)) revert PairExist();
         bytes memory bytecode = type(Pair).creationCode;
@@ -43,6 +46,9 @@ contract Factory {
     }
 
     function setFeeTo(address _feeTo) external {
+        if (_feeTo == address(0)) {
+            revert ZeroAddress();
+        }
         if (msg.sender != feeToSetter) {
             revert NotAuthorized();
         }

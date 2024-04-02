@@ -39,14 +39,18 @@ contract StakingContract is IERC721Receiver {
     // Custom errors
     error IncorrectOwner(); // Error thrown when a user tries to withdraw a stake that they don't own
     error NFTContractOnly(); // Error thrown when a non-NFT contract tries to interact with the staking contract
-
+    error ZeroAdress(); // Error thrown when zero address
     // Events
+
     event NFTDeposited(address indexed user, uint256 tokenId); // Event emitted when an NFT is deposited
     event NFTWithdrawn(address indexed user, uint256 tokenId); // Event emitted when an NFT is withdrawn
     event RewardsClaimed(address indexed user, uint256 rewardToMint); // Event emitted when rewards are claimed
 
     // Constructor function
     constructor(address _nft) {
+        if (_nft == address(0)) {
+            revert ZeroAdress();
+        }
         nft = _nft;
         rewardToken = new RewardToken(); // Deploy a new instance of the RewardToken contract
     }

@@ -10,11 +10,16 @@ import {IERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions
 contract PrimeNFTCounter {
     address public enumerableNft; // Address of the ERC721Enumerable contract
 
+    error ZeroAdress();
+
     /**
      * @dev Constructor to set the address of the ERC721Enumerable contract.
      * @param _enumerableNft Address of the ERC721Enumerable contract.
      */
     constructor(address _enumerableNft) {
+        if (_enumerableNft == address(0)) {
+            revert ZeroAdress();
+        }
         enumerableNft = _enumerableNft;
     }
 
