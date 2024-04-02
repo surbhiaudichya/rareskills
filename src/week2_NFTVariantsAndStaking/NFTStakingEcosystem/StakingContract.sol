@@ -82,11 +82,11 @@ contract StakingContract is IERC721Receiver {
         // Update the user's balance and debt
         _users.totalBalance = _userTotalBalance + 1;
         _users.debt = _users.totalBalance * _accRewardPerToken;
+        // Record the stake
+        stakes[tokenId] = from;
         // Mint the reward tokens and emit an event
         if (rewardToMint > 0) rewardToken.mint(from, rewardToMint);
         emit RewardsClaimed(from, rewardToMint);
-        // Record the stake
-        stakes[tokenId] = from;
         // Emit an event for the deposit
         emit NFTDeposited(from, tokenId);
         return IERC721Receiver.onERC721Received.selector;
