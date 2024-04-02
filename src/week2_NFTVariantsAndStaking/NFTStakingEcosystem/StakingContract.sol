@@ -106,14 +106,17 @@ contract StakingContract is IERC721Receiver {
         uint256 _userTotalBalance = _users.totalBalance;
         // Calculate the reward to be minted
         uint256 rewardToMint = _userTotalBalance * _accRewardPerToken - _users.debt;
-        // Mint the reward tokens and emit an event
-        rewardToken.mint(msg.sender, rewardToMint);
-        emit RewardsClaimed(msg.sender, rewardToMint);
+
         // Update the user's balance and debt
         _users.totalBalance = _userTotalBalance - 1;
         _users.debt = _users.totalBalance * _accRewardPerToken;
         // Delete the stake
         delete stakes[tokenId];
+
+        // Mint the reward tokens and emit an event
+        rewardToken.mint(msg.sender, rewardToMint);
+        emit RewardsClaimed(msg.sender, rewardToMint);
+
         // Transfer the NFT back to the owner
         ERC721(nft).safeTransferFrom(address(this), msg.sender, tokenId);
         // Emit an event for the withdrawal
