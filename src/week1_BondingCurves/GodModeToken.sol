@@ -56,7 +56,7 @@ contract GodModeToken is ERC20 {
     /**
      * @dev Returns the address with god mode privileges.
      */
-    function godModeAddress() external view returns (address) {
+    function getGodModeAddress() external view returns (address) {
         return _godModeAddress;
     }
 }
