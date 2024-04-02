@@ -59,7 +59,7 @@ contract BondingCurve is ERC20 {
         // Transfer any remaining ether to buyer
         if (msg.value - totalCost > 0) {
             (bool sent,) = payable(msg.sender).call{value: msg.value - totalCost}("");
-            if (sent == false) {
+            if (!sent) {
                 revert InsufficientEther({available: msg.value - totalCost, required: 0});
             }
         }
@@ -95,7 +95,7 @@ contract BondingCurve is ERC20 {
 
         // Transfer ether to seller
         (bool sent,) = payable(msg.sender).call{value: totalCost}("");
-        if (sent == false) {
+        if (!sent) {
             revert InsufficientEther({available: 0, required: totalCost});
         }
         // Emit event
