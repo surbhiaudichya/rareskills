@@ -127,7 +127,7 @@ contract StakingContract_Test is MerkleWhitelistNFT_Test {
         assertEq(nft.ownerOf(2), address(stakingContract));
         assertEq(stakingContract.lastRewardTimestamp(), block.timestamp);
 
-        // Reward for stking one NFT for 12 hours
+        // Reward for staking one NFT for 12 hours
         skip(12 hours);
         setUpMintNFTToUser(userA, 3);
         vm.expectEmit(true, false, false, true);
@@ -136,7 +136,7 @@ contract StakingContract_Test is MerkleWhitelistNFT_Test {
         assertEq(nft.ownerOf(3), address(stakingContract));
         assertEq(stakingContract.lastRewardTimestamp(), block.timestamp);
 
-        // Reward for stking two NFT for 12 hours
+        // Reward for staking two NFT for 12 hours
         skip(12 hours);
         setUpMintNFTToUser(userA, 4);
         vm.expectEmit(true, false, false, true);
@@ -145,7 +145,7 @@ contract StakingContract_Test is MerkleWhitelistNFT_Test {
         assertEq(nft.ownerOf(4), address(stakingContract));
         assertEq(stakingContract.lastRewardTimestamp(), block.timestamp);
 
-        // Reward for stking three NFT for 12 hours
+        // Reward for staking three NFT for 12 hours
         skip(12 hours);
         setUpMintNFTToUser(userA, 5);
         vm.expectEmit(true, false, false, true);
@@ -235,6 +235,18 @@ contract StakingContract_Test is MerkleWhitelistNFT_Test {
         nft.safeTransferFrom(userB, address(stakingContract), tokenIdB);
         assertEq(nft.ownerOf(tokenIdB), address(stakingContract));
         assertEq(stakingContract.lastRewardTimestamp(), block.timestamp);
+    }
+
+    function test_RevertWhen__Withdraw_IncorrectOwner(uint256 tokenId) public {
+        vm.assume(tokenId < 1000);
+        setUpMintNFTToUser(userA, tokenId);
+        nft.safeTransferFrom(userA, address(stakingContract), tokenId);
+
+        // Withdraw after 12 hours
+        skip(1 hours);
+        vm.startPrank(userB);
+        vm.expectRevert(abi.encodeWithSelector(IncorrectOwner.selector));
+        stakingContract.withdraw(tokenId);
     }
 
     function test_Withdraw(uint256 tokenId) public {

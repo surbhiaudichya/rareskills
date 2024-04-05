@@ -26,12 +26,20 @@ contract PrimeNFTCounter_Test is EnumerableNFT_Test {
         for (uint256 i = 1; i < 11; ++i) {
             enumerableNFT.mint{value: 0.5 ether}(i);
         }
+
         vm.stopPrank();
         vm.startPrank(users.bob);
 
-        for (uint256 i = 11; i < 21; ++i) {
+        for (uint256 i = 11; i < 16; ++i) {
             enumerableNFT.mint{value: 0.5 ether}(i);
         }
+        // Mint tokens for different scenarios to achieve 100% branch test coverage
+        // for the line: if (number % i == 0 || number % (i + 2) == 0) return false;
+        enumerableNFT.mint{value: 0.5 ether}(25);
+        enumerableNFT.mint{value: 0.5 ether}(49);
+        enumerableNFT.mint{value: 0.5 ether}(29);
+        enumerableNFT.mint{value: 0.5 ether}(35);
+
         vm.stopPrank();
     }
 
@@ -44,6 +52,6 @@ contract PrimeNFTCounter_Test is EnumerableNFT_Test {
 
         vm.prank(users.bob);
         uint256 bobPrimeNftCount = primeNFTCounter.getPrimeNftTotalBalance(users.bob);
-        assertEq(bobPrimeNftCount, 4, "prime nft total count");
+        assertEq(bobPrimeNftCount, 3, "prime nft total count");
     }
 }

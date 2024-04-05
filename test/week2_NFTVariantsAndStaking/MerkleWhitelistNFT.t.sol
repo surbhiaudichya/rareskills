@@ -4,7 +4,6 @@ pragma solidity >= 0.6.0 < 0.9.0;
 import {Test} from "forge-std/Test.sol";
 import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-
 import {MerkleWhitelistNFT} from "../../src/week2_NFTVariantsAndStaking/NFTStakingEcosystem/MerkleWhitelistNFT.sol";
 
 contract MerkleWhitelistNFT_Test is Test {
@@ -17,6 +16,7 @@ contract MerkleWhitelistNFT_Test is Test {
     error MaxSupplyReached(); // Error when maximum supply of NFTs is reached
     error AlreadyMinted(); // Error when attempting to mint an already minted NFT
     error InvalidMerkleProof(); // Error for invalid Merkle proof
+    error FailedToSendEther();
 
     /// VARIABLES
     MerkleWhitelistNFT internal nft;
@@ -107,20 +107,15 @@ contract MerkleWhitelistNFT_Test is Test {
     }
 
     /// @dev It should revert.
-    function test_RevertWhen_WhitelistMint_MaxSupplyReached() external whenCallerIsWhitelistedAddress {
-        vm.startPrank(userC);
-
+    function test_RevertWhen_Whitelist_Mint_MaxSupplyReached() external whenCallerIsNonWhitelistedAddress {
+        for (uint256 i; i < 1000; i++) {
+            nft.mint{value: 0.5 ether}(i);
+        }
         // proof corresponding to userC and index 3
         bytes32[] memory proof = new bytes32[](2);
         proof[0] = 0xf4db59b54a5e9961a45b0001f7477f286d59ef59c37f4ab9ab5c29eb4b34004a;
         proof[1] = 0x903bb9eadd38da603295afd967a5629ae1d6ccf678cffbf86e785c4a63304057;
 
-        // Mocking a public totalSupply variable
-        vm.mockCall(address(nft), abi.encodeWithSelector(bytes4(keccak256("totalSupply()"))), abi.encode(1000));
-        assertEq(nft.totalSupply(), 1000);
-
-        bytes memory customError = abi.encodeWithSelector(MaxSupplyReached.selector);
-        vm.mockCallRevert(address(nft), abi.encodeWithSelector(nft.whitelistMint.selector), customError);
         vm.expectRevert(abi.encodeWithSelector(MaxSupplyReached.selector));
         nft.whitelistMint{value: 0.25 ether}(proof, 1001, 3);
     }
@@ -197,6 +192,22 @@ contract MerkleWhitelistNFT_Test is Test {
         nft.whitelistMint{value: 0.25 ether}(proof, 1, 3);
     }
 
+    /// @dev It should revert when withdrawEther low-level call return false
+    function test_RevertWhen_withdrawEther_FailedToSendEther() external {
+        vm.startPrank(owner);
+        // Deploy Rejector contract
+        Rejector rejector = new Rejector();
+        // Set the Rejector contract as the owner of the NFT contract
+        nft.transferOwnership(address(rejector));
+        vm.stopPrank();
+        vm.startPrank(address(rejector));
+        nft.acceptOwnership();
+        // Call withdrawEther, it should revert due to the failure of ether transfer
+        vm.expectRevert(abi.encodeWithSelector(FailedToSendEther.selector));
+        nft.withdrawEther();
+        vm.stopPrank();
+    }
+
     /// @dev it allow owner to withdraw accumulated ether
     function test_withdraw_EtherToOwner() external {
         vm.prank(userC);
@@ -206,5 +217,12 @@ contract MerkleWhitelistNFT_Test is Test {
         nft.withdrawEther();
         uint256 balanceAfter = owner.balance;
         assertEq(balanceAfter - balanceBefore, 0.5 ether, "expect increase of 0.5 ether");
+    }
+}
+
+// Helper contract  To test the fail condition of “(bool sent,)” we need the Ether transfer to fail.
+contract Rejector {
+    fallback() external {
+        revert("receive reverted");
     }
 }

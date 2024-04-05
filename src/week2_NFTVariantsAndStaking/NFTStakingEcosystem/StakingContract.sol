@@ -40,8 +40,8 @@ contract StakingContract is IERC721Receiver {
     error IncorrectOwner(); // Error thrown when a user tries to withdraw a stake that they don't own
     error NFTContractOnly(); // Error thrown when a non-NFT contract tries to interact with the staking contract
     error ZeroAdress(); // Error thrown when zero address
-    // Events
 
+    // Events
     event NFTDeposited(address indexed user, uint256 tokenId); // Event emitted when an NFT is deposited
     event NFTWithdrawn(address indexed user, uint256 tokenId); // Event emitted when an NFT is withdrawn
     event RewardsClaimed(address indexed user, uint256 rewardToMint); // Event emitted when rewards are claimed
@@ -84,9 +84,9 @@ contract StakingContract is IERC721Receiver {
         _users.debt = _users.totalBalance * _accRewardPerToken;
         // Record the stake
         stakes[tokenId] = from;
-        // Mint the reward tokens and emit an event
         if (rewardToMint > 0) rewardToken.mint(from, rewardToMint);
         emit RewardsClaimed(from, rewardToMint);
+
         // Emit an event for the deposit
         emit NFTDeposited(from, tokenId);
         return IERC721Receiver.onERC721Received.selector;

@@ -15,6 +15,7 @@ contract EnumerableNFT_Test is Test {
     error InvalidTokenId();
     error ERC721InvalidSender(address);
     error OwnableUnauthorizedAccount(address sender);
+    error FailedToSendEther();
 
     ///  STRUCTS
     struct Users {
@@ -130,6 +131,22 @@ contract EnumerableNFT_Test is Test {
         enumerableNFT.mint{value: 0.5 ether}(id);
     }
 
+    /// @dev It should revert when withdrawEther low-level call return false
+    function test_RevertWhen_withdrawEther_FailedToSendEther() external {
+        vm.startPrank(users.admin);
+        // Deploy Rejector contract
+        Rejector rejector = new Rejector();
+        // Set the Rejector contract as the owner of the NFT contract
+        enumerableNFT.transferOwnership(address(rejector));
+        vm.stopPrank();
+        vm.startPrank(address(rejector));
+        enumerableNFT.acceptOwnership();
+        // Call withdrawEther, it should revert due to the failure of ether transfer
+        vm.expectRevert(abi.encodeWithSelector(FailedToSendEther.selector));
+        enumerableNFT.withdrawEther();
+        vm.stopPrank();
+    }
+
     /// @dev it should emit WithdrawEther event
     function test_WithdrawEther_Event() external {
         vm.prank(users.alice);
@@ -138,5 +155,12 @@ contract EnumerableNFT_Test is Test {
         vm.expectEmit({checkTopic1: true, checkTopic2: true, checkTopic3: true, checkData: true});
         emit WithdrawEther(users.admin, 0.5 ether);
         enumerableNFT.withdrawEther();
+    }
+}
+
+// Helper contract  To test the fail condition of “(bool sent,)” we need the Ether transfer to fail.
+contract Rejector {
+    fallback() external {
+        revert("receive reverted");
     }
 }
