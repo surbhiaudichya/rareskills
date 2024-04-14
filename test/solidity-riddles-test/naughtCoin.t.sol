@@ -13,7 +13,7 @@ contract NaughtCoin_Test is Test {
     address private alice = makeAddr("Alice");
 
     function setUp() public {
-        coin = new NaughtCoin(player););
+        coin = new NaughtCoin(player);
     }
 
     // Players can approve another address to transfer tokens on their behalf using the `approve` function.
