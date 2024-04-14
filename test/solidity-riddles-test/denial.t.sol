@@ -6,7 +6,7 @@ import {Denial} from "../../src/solidity-riddles/Denial.sol";
 
 import {AttackDenial} from "../../src/solution-solidity-riddles/AttackDenial.sol";
 
-/// @title AttackOvermint1_Test
+/// @title AttackDenial_Test
 /// @author Surbhi Audichya
 contract AttackDenial_Test is Test {
     Denial private denial;
