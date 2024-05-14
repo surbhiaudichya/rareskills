@@ -10,3 +10,9 @@
 [submodule "lib/openzeppelin-contracts-v4.9.4"]
 	path = lib/openzeppelin-contracts-v4.9.4
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "src/week12_Huff/huff-puzzles/lib/forge-std"]
+	path = src/week12_Huff/huff-puzzles/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "src/week12_Huff/huff-puzzles/lib/foundry-huff"]
+	path = src/week12_Huff/huff-puzzles/lib/foundry-huff
+	url = https://github.com/huff-language/foundry-huff

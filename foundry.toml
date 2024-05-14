@@ -7,6 +7,8 @@ remappings = [
     "@openzeppelin/merkle-tree=lib/merkle-tree",
     "solady/=lib/solady",
     "@openzeppelin/contracts-v4.9.4=lib/openzeppelin-contracts-v4.9.4/contracts",
+    "forge-std/=src/week12_Huff/huff-puzzles/lib/forge-std/src/",
+    "foundry-huff/=src/week12_Huff/huff-puzzles/lib/foundry-huff/src",
 ]
 
 gas_reports = ["*"]
