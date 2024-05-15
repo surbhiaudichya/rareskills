@@ -8,6 +8,14 @@
  *  The task is to write within the `MAIN` macro below, huff code to get and return the amount of ether sent as part of that call 
 */
 
-#define macro MAIN() = takes(0) returns(0) {
-    
+#define macro MAIN() = takes(0) returns(0) { 
+  callvalue  // [msg.value] stack output: the value of the current call in wei.
+
+  0x00       // [0, msg.value] 0x00 is automatically pushed to the stack, it is assumed to be a literal by the compiler.
+  
+  mstore     // []  Save word to memory. Stack input: byte offset in memory in bytes, value (32 bytes) write in the memory.
+  
+  0x20       // [0x020]       size
+  0x00       // [0x00, 0x20]  offset
+  return     // Halt execution returning output data.  stack input: byte offset in memory in bytes and byte size of the return data.
 }
