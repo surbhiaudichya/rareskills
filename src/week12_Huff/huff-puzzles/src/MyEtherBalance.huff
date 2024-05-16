@@ -8,5 +8,11 @@
  */
 
 #define macro MAIN() = takes(0) returns(0) {
-   
+   caller      // [msg.sender] stack output: the 20-byte address of the caller account.
+   balance     // [balance] stack output: balance of the given account in wei. Returns 0 if the account doesn't exist.
+   0x00        // [0x00, balance] stack output: push offset
+   mstore      // [] Save word to memory. Stack input: byte offset in memory in bytes, value (32 bytes) write in the memory.
+   0x20        // [0x20] stack stack output: push byte size (32 bytes)
+   0x00        // [0x00, 0x20] stack output: push byte offset 
+   return      // return balance stored in memory
 }
