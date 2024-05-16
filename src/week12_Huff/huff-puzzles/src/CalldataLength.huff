@@ -9,5 +9,10 @@
 */
 
 #define macro MAIN() = takes(0) returns(0) {
-    
+calldatasize   // [calldata size] stack output: Get size (value) of input data in current environment
+0x00           // [0, calldatasize] stack output: 0x00 (offset) is pushed to the stack
+mstore         // []  Save word to memory. Stack input: byte offset in memory in bytes, value (32 bytes) write in the memory.
+0x20           // [0x020]       stack output: push size
+0x00           // [0x00, 0x20]  stack output: push offset
+return         // Halt execution returning calldatasize. stack input: byte offset in memory in bytes and byte size of the return data.
 }
