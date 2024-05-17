@@ -11,7 +11,25 @@
 
 #define function add1(uint256) payable returns(uint256)
 
+#define macro ADD1() = takes (1) returns (1) {
+                             // Stack Input: [input_num]
+    0x01                     // Stack Output: [0x01, input_num]. Push 0x01
+    add                      // Stack Output: [0x01 + input_num]. Push addition operation result
+                             // Return [0x01 + input_num]
+}
 
 #define macro MAIN() = takes(0) returns(0) {
-
+    0x00                     // Stack Output: [0x00]  push byte offset in the calldata.
+    calldataload             // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr                 // [func_sig (calldata @ 0x00 >> 0xE0)]
+    __FUNC_SIG(add1)         // [func_sig(add1), func_sig]
+    eq                       // [func_sig(add1) == func_sig]
+    add1 jumpi               // []
+    0x00 0x00 revert         // Revert if no function signature matched
+    add1:
+    0x04                     // Stack Output: [0x04] push byte offset
+    calldataload             // Stack Output: [input_num] push input number (32-byte value) starting from the given offset of the calldata.
+    ADD1()                   // Stack Input: [input_num] Stack Output: [result]
+    0x00 mstore              // Stack Input: [offset, result] Stack Output: []. Save word to memory
+    0x20 0x00 return         // Stack Input: [offset in the memory, byte size of return data] Stack Output: []    Halt execution returning output data
 }
