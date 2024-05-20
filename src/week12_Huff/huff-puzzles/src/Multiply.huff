@@ -11,7 +11,56 @@
 
 #define function multiply(uint256, uint256) payable returns(uint256)
 
+#define fn MUL(err) = takes (2) returns (1) {
+                             // Starting Stack: [input_num2, input_num1, return_pc]   
+    dup1                     // Stack Output: [input_num2, input_num2, input_num1, return_pc]
+    0x00 eq                  // Stack Output: [0 == input_num2, input_num2, input_num1, return_pc]
+    multiplication jumpi
+    dup2                     // Stack Output: [input_num1, input_num2, input_num1, return_pc]
+    dup2                     // Stack Output: [input_num2, input_num1, input_num2, input_num1, return_pc]
+    dup2                     // Stack Output: [input_num1, input_num2, input_num1, input_num2, input_num1, return_pc]
+    dup2                     // Stack Output: [input_num2, input_num1, input_num2, input_num1, input_num2, input_num1, return_pc]    
+    mul                      // Stack Output: [input_num2 * input_num1, input_num2, input_num1,input_num2, input_num1, return_pc]
+    div                      // Stack Output: [result / input_num2, input_num1, input_num2, input_num1, return_pc]
+    eq                       // Stack Output: [result / input_num2 ==  input_num1, input_num2, input_num1, return_pc]  
+    multiplication jumpi     // Stack Output: [input_num2, input_num1, return_pc]
+    0x00 0x00 revert         
+    
+    multiplication:
+    mul 
+                             // Return [input_num2 * input_num1, return_pc]
+}
 
 #define macro MAIN() = takes(0) returns(0) {
-
+    0x00                     // Stack Output: [0x00]  push byte offset in the calldata.
+    calldataload             // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr                 // [func_sig (calldata @ 0x00 >> 0xE0)]
+    __FUNC_SIG(multiply)     // [func_sig(multiply), func_sig]
+    eq                       // [func_sig(multiply) == func_sig]
+    multiply jumpi           // []
+    0x00 0x00 revert         // Revert if no function signature matched
+    multiply:
+    0x04                     // Stack Output: [0x04] push byte offset
+    calldataload             // Stack Output: [input_num1] push input number (32-byte value) starting from the given offset of the calldata.
+    0x24                     // Stack Output: [0x24, input_num1] push byte offset
+    calldataload             // Stack Output: [input_num2, input_num1] push second input number (32-byte value) starting from the given offset of the calldata.
+                             //
+                             // Code inserted when a function is invoked:
+                             // PUSH2 return_pc
+                             //  <num_inputs swap ops>
+                             // PUSH2 func_start_pc
+                             // JUMP
+                             // JUMPDEST <- this is the return_pc
+                             //  
+    MUL()                    // Stack Input:  [input_num2, input_num1, return_pc] Stack Output: [input_num2 * input_num1]
+                             // 
+                             // Final function code:
+                             // 👇 func_start_pc
+                             // JUMPDEST           [input_num2, input_num1, return_pc]
+                             // function code ...  [result, return_pc]
+                             // SWAP1              [return_pc, result]
+                             // JUMP               [result]
+                             // 
+    0x00 mstore              // Stack Input: [offset, result] Stack Output: []. Save word to memory
+    0x20 0x00 return         // Stack Input: [offset in the memory, byte size of return data] Stack Output: [] Halt execution returning output data
 }
