@@ -14,7 +14,23 @@
  #define function foo() payable returns(uint256)
  #define function bar() payable returns(uint256)
 
-
-#define macro MAIN() = takes(0) returns(0) {
-
-}
+ #define macro MAIN() = takes(0) returns(0) {
+    0x00 calldataload     // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr              // [func_sig (calldata @ 0x00 >> 0xE0)]
+    dup1                  // [func_sig, func_sig]
+    __FUNC_SIG(foo)       // [func_sig(foo), func_sig, func_sig]
+    eq                    // [func_sig(foo) == func_sig, func_sig]
+    foo jumpi             // [func_sig]
+    __FUNC_SIG(bar)       // [func_sig(bar), func_sig]
+    eq                    // [func_sig(bar) == func_sig]
+    bar jumpi             // []
+    0x00 0x00 revert      // revert if non matching selector
+    foo:
+        0x02
+        0x00 mstore
+        0x20 0x00 return 
+    bar:
+        0x03
+        0x00 mstore
+        0x20 0x00 return
+ }
