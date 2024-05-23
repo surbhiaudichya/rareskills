@@ -13,8 +13,35 @@
 
 #define function store(uint256) payable returns()
 #define function read() payable returns(uint256)
+// Get a free storage slot to store the argument
+#define constant ARGUMENT = FREE_STORAGE_POINTER()
 
+
+#define macro STORE() = takes (0) returns (0) {
+    0x04 calldataload     // Input stack: [one_function_argument]
+    0x00 sstore           // store the argument value in slot zero
+}
+
+#define macro READ() = takes (0) returns (0) {
+    0x00 sload            // Input stack: [one_function_argument] 
+    0x00 mstore           // Stack Input: [offset, result] Stack Output: []. Save word to memory      
+    0x20 0x00 return      // Stack Input: [offset in the memory, byte size of return data] Stack Output: [] Halt execution returning output data
+}
 
 #define macro MAIN() = takes(0) returns(0) {
-    
+    0x00 calldataload           // [0x00@calldata]
+    0xE0 shr                    // [0x00@calldata >> 0xE0] function_sign
+    dup1                        // [function_sign, function_sign]
+    __FUNC_SIG(store)           // [function_sign(store), function_sign, function_sign]
+    eq                          // [function_sign(store) == function_sign, function_sign]
+    store jumpi                 // [function_sign]
+    dup1                        // [function_sign, function_sign]
+    __FUNC_SIG(read)            // [function_sign(read), function_sign, function_sign]           
+    eq                          // [function_sign(read) == function_sign, function_sign]
+    read jumpi                  // [function_sign]
+    0x00 0x00 revert            // Revert if no function signature matched
+    store:                      // Create a store jump label
+    STORE()                     // Call the `STORE()`
+    read:                       // Create a read jump label
+    READ()                      // Call the `READ()`
 }
