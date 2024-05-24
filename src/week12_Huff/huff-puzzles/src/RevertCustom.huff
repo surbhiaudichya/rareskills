@@ -14,5 +14,8 @@
 #define error OnlyHuff()
 
 #define macro MAIN() = takes(0) returns(0) {
-    
+    __ERROR(OnlyHuff)          // [custom_error_code_selector]
+    0x00                       // [0x00, custom_error_code_selector] 
+    mstore                     // save word to memory
+    0x20 0x00 revert           // Halt execution reverting state changes but returning data and remaining gas
 }
