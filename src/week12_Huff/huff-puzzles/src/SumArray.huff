@@ -10,7 +10,64 @@
 
 #define function sumArray(uint256[]) payable returns(uint256)
 
+#define macro sumArray() = takes(0) returns(0){
+                              // calldata @0x00-@0x03: func_sig, @0x04-@0x23 : offset suggest where array data starts, @0x24-@0x43: legth of array, @0x44-@0x63  array item1 ,@0x64-@0x83, @x84-
+    0x24                      // Stack Output: [0x24] | offset 
+    calldataload              // Stack Output: [length] | length of array
+    0x20                      // Stack Output: [0x20, length]  | (length * 0x20) + 0x24 will be the offset for the last number
+    mul
+    0x24                      // Stack Output: [0x24, array total size]
+    add                       // Stack Output: [@0xoffset_of_last_item_array] offset for last item in array 
+    
+    0x00                      // Stack Output: [0x00, @0xoffset_of_last_item_array]
+    0x44                      // Stack Output: [0x44, 0x00, @0xoffset_of_last_item_array]
+    doWhileLoop jump
+                              // Stack Input: [offset_array_item, total, offset_last_array_item]
+                              // Step1: calldataload the array item and callculate total. 
+                              // Step2: i++ i.e adding 20 bytes to prev array item offset
+                              // Step3: Check if new offset is greater than last array item offset. If yes, finish loop. else got to step 1. 
+    doWhileLoop:
+                              // step 1
+        dup1                  // Stack Output: [0x44, 0x44, 0x00, @0xoffset_of_last_item_array]
+        calldataload          // Stack Output: [arrayItem1, 0x44, 0x00, @0xoffset_of_last_item_array]
+        swap1                 // Stack Output: [0x44, arrayItem1, 0x00, @0xoffset_of_last_item_array] 
+        swap2                 // Stack Output: [0x00, arrayItem1, 0x44, @0xoffset_of_last_item_array]
+        add                   // Stack Output: [0x00 + arrayItem1, 0x44, @0xoffset_of_last_item_array]   
+
+                              // Step 2
+        swap2                 // Stack Output: [@0xoffset_of_last_item_array, 0x44, sum]
+        swap1                 // Stack Output: [0x44, @0xoffset_of_last_item_array, sum] 
+        0x20                  // Stack Output: [0x20, 0x44, @0xoffset_of_last_item_array, sum]  
+        add                   // Stack Output: [0x20 + 0x44, @0xoffset_of_last_item_array, sum] | offset of next array item in calldata
+
+                              // Step 3: 
+        dup1                  // Stack Output: [0x64, 0x64, @0xoffset_of_last_item_array, sum] 
+        swap2                 // Stack Output: [@0xoffset_of_last_item_array, 0x64, 0x64, sum]
+        dup1                  // Stack Output: [@0xoffset_of_last_item_array, @0xoffset_of_last_item_array, 0x64, 0x64, sum]  
+        swap2                 // Stack Output: [0x64, @0xoffset_of_last_item_array, @0xoffset_of_last_item_array, 0x64, sum] 
+        gt                    // Stack Output: [0x64 > @0xoffset_of_last_item_array, @0xoffset_of_last_item_array, 0x64, sum]  
+        haltDoWhileLoop jumpi // Stack Output: [0x64 > @0xoffset_of_last_item_array ? 1 | 0, @0xoffset_of_last_item_array, 0x64, sum]  
+
+        
+        swap2                 // Stack Output: [sum, 0x64, @0xoffset_of_last_item_array]
+        swap1                 // Stack Output: [0x64, sum, @0xoffset_of_last_item_array]
+        doWhileLoop jump 
+
+        haltDoWhileLoop:
+        pop                   // Stack Output: [0x64, sum]   
+        pop                   // Stack Output: [sum]  
+        0x00 mstore           // Stack Input: [offset, totalSum] Stack Output: []. Save word to memory
+        0x20 0x00 return      // Stack Input: [offset in the memory, byte size of return data] Stack Output: [] | Halt execution returning output data
+}
 
 #define macro MAIN() = takes(0) returns(0) {
-
+    0x00                     // Stack Output: [0x00]  push byte offset in the calldata.
+    calldataload             // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr                 // [func_sig (calldata @ 0x00 >> 0xE0)]
+    __FUNC_SIG(sumArray)     // [func_sig(sumArray), func_sig]
+    eq                       // [func_sig(sumArray) == func_sig]
+    sumArray jumpi           // []
+    0x00 0x00 revert         // Revert if no function signature matched
+    sumArray:
+      sumArray()
 }
