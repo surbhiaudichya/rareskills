@@ -7,7 +7,24 @@
  *  The task is to write within the `MAIN` macro below, a function that returns the keccak256 of the calldata. Should handle zero calldata
  */
 
-
- #define macro MAIN() = takes(0) returns(0) {
+// To-Do:  understand why this test fail when using keccak256 opcode instead of sha3?
+ #define macro MAIN() = takes(0) returns(0) { 
+    calldatasize             // Stack Output: [calldatasize] | Get calldata size 
+    dup1                     // Stack Output: [calldatasize, calldatasize] Duplicate calldata size for later use
+    iszero 
+    zeroCase jumpi           // If calldata is empty, return keccak256 of empty string
     
+    dup1                     // Stack Output: [calldatasize, calldatasize]
+    0x00                     // Stack Output: [0x00, calldatasize, calldatasize] | destOffset: byte offset in the memory where the result will be copied.
+    0x00                     // Stack Output: [0x00, 0x00, calldatasize, calldatasize] | offset: byte offset in the calldata to copy.
+    calldatacopy             // Stack Output: [calldatasize]  Memory Output: [@0x00-calldata] | Copy calldata to memory at offset 0x00                          // [ calldata, calldatasize] 
+    0x00                     // Stack Output: [0x00, calldatasize] Memory Output: [@0x00-calldata]
+    sha3                     // Stack Output: [hash] Memory Output: [@0x00-@calldatazise_calldata]| Hash the copied calldata
+    0x00 mstore              // Store the hash in memory at 0x00
+    0x20 0x00 return         // Stack Input: [offset in the memory, byte size of return data] Stack Output: [] | Halt execution returning output data
+
+    zeroCase:                // Handle zero calldata case
+    0x00 0x00 sha3           // Hash empty memory
+    0x00 mstore              // Stack Input: [offset, Store the hash] Stack Output: []. Save word to memory
+    0x20 0x00 return         // Stack Input: [offset in the memory, byte size of return data] Stack Output: [] | Halt execution returning output data
  }
