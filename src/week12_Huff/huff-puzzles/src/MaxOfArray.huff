@@ -9,6 +9,83 @@
 
 #define function maxOfArray(uint256[]) payable returns(uint256)
 
+#define macro maxOfArray() = takes(0) returns(0){
+                              // calldata @0x00-@0x03: func_sig, @0x04-@0x23 : offset suggest where array data starts, @0x24-@0x43: legth of array, @0x44-@0x63  array item1 ,@0x64-@0x83, @x84-
+    0x24                      // Stack Output: [0x24] | offset 
+    calldataload              // Stack Output: [length] | length of array
+    dup1                      // Stack Output: [length, length] | length of array
+    0x00                      // Stack Output: [0x00, length, length] | length of array
+    eq                        // Stack Output: [0x00 == length, length] | length of array
+    halt jumpi                // revert empty array
+    
+    0x20                      // Stack Output: [0x20, length]  | (length * 0x20) + 0x24 will be the offset for the last number
+    mul
+    0x24                      // Stack Output: [0x24, array total size]
+    add                       // Stack Output: [@0xoffset_of_last_item_array] offset for last item in array 
+    
+    0x00                      // Stack Output: [0x00, @0xoffset_of_last_item_array]
+    0x44                      // Stack Output: [0x44, 0x00, @0xoffset_of_last_item_array]
+    doWhileLoop jump
+                              // Stack Input: [offset_array_item, MaxValue, offset_last_array_item]
+                              // Step1: calldataload the array item and compare array_item[i] > maxValue ? set it as MaxValue. 
+                              // Step2: i++ i.e adding 20 bytes to prev array item offset
+                              // Step3: Check if new offset is greater than last array item offset. If yes, finish loop. else got to step 1. 
+    doWhileLoop:
+                              // step 1
+        dup1                  // Stack Output: [@itemOffset_0x44, @itemOffset_0x44, @MaxValue_0x00, @0xoffset_of_last_item_array]
+        calldataload          // Stack Output: [arrayItem[i], @itemOffset_0x44, @MaxValue_0x00, @0xoffset_of_last_item_array]
+        swap1                 // Stack Output: [@itemOffset_0x44, arrayItem[i], @MaxValue_0x00, @0xoffset_of_last_item_array] 
+        swap2                 // Stack Output: [@MaxValue_0x00, arrayItem[i], @itemOffset_0x44, @0xoffset_of_last_item_array]
+        dup2                  // Stack Output: [arrayItem[i], @MaxValue_0x00, arrayItem[i], @itemOffset_0x44, @0xoffset_of_last_item_array]
+        dup2                  // Stack Output: [@MaxValue_0x00, arrayItem[i], @MaxValue_0x00, arrayItem[i], @itemOffset_0x44, @0xoffset_of_last_item_array]
+        lt                    // Stack Output: [@MaxValue_0x00 < arrayItem[i], @MaxValue_0x00, arrayItem[i], @itemOffset_0x44, @0xoffset_of_last_item_array]   
+        updateMaxValue jumpi
+        swap1                 // Stack Output: [arrayItem[i], @MaxValue_0x00, @itemOffset_0x44, @0xoffset_of_last_item_array]   
+        pop                   // Stack Output: [@MaxValue, @itemOffset_0x44, @0xoffset_of_last_item_array]   
+        stepTwo jump
+
+        stepTwo:              // Step 2  Starting condition Stack Output [maxValue, @itemOffset_0x44, @0xoffset_of_last_item_array]
+        swap2                 // Stack Output: [@0xoffset_of_last_item_array, @itemOffset_0x44, maxValue]
+        swap1                 // Stack Output: [@itemOffset_0x44, @0xoffset_of_last_item_array, maxValue] 
+        0x20                  // Stack Output: [0x20, @itemOffset_0x44, @0xoffset_of_last_item_array, maxValue]  
+        add                   // Stack Output: [0x20 + 0x44, @0xoffset_of_last_item_array, maxValue] | offset of next array item in calldata
+
+                              // Step 3: 
+        dup1                  // Stack Output: [@itemOffset_0x64, @itemOffset_0x64, @0xoffset_of_last_item_array, maxValue] 
+        swap2                 // Stack Output: [@0xoffset_of_last_item_array, @itemOffset_0x64, @itemOffset_0x64, maxValue]
+        dup1                  // Stack Output: [@0xoffset_of_last_item_array, @0xoffset_of_last_item_array, @itemOffset_0x64, @itemOffset_0x64, maxValue]  
+        swap2                 // Stack Output: [@itemOffset_0x64, @0xoffset_of_last_item_array, @0xoffset_of_last_item_array, @itemOffset_0x64, maxValue] 
+        gt                    // Stack Output: [@itemOffset_0x64 > @0xoffset_of_last_item_array, @0xoffset_of_last_item_array, @itemOffset_0x64, maxValue]  
+        haltDoWhileLoop jumpi // Stack Output: [0x64 > @0xoffset_of_last_item_array ? 1 | 0, @0xoffset_of_last_item_array, @itemOffset_0x64, maxValue]  
+
+        
+        swap2                 // Stack Output: [maxValue, 0x64, @0xoffset_of_last_item_array]
+        swap1                 // Stack Output: [0x64, maxValue, @0xoffset_of_last_item_array]
+        doWhileLoop jump 
+
+        haltDoWhileLoop:
+        pop                   // Stack Output: [0x64, maxValue]   
+        pop                   // Stack Output: [maxValue]  
+        0x00 mstore           // Stack Input: [offset, maxValue] Stack Output: []. Save word to memory
+        0x20 0x00 return      // Stack Input: [offset in the memory, byte size of return data] Stack Output: [] | Halt execution returning output data        
+        
+        updateMaxValue:
+        pop                   // Stack Output: [arrayItem[i], @itemOffset_0x44, @0xoffset_of_last_item_array]   
+        stepTwo jump
+}
+
 #define macro MAIN() = takes(0) returns(0) {
-   
+    0x00                        // Stack Output: [0x00]  push byte offset in the calldata.
+    calldataload                // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr                    // [func_sig (calldata @ 0x00 >> 0xE0)]
+    __FUNC_SIG(maxOfArray)      // [func_sig(maxOfArray), func_sig]
+    eq                          // [func_sig(maxOfArray) == func_sig]
+    maxOfArray jumpi            // []
+    halt jump
+
+    maxOfArray:
+      maxOfArray()
+
+    halt:
+    0x00 0x00 revert           // Revert if no function signature matched or empty array
 }
