@@ -11,7 +11,52 @@
 
  #define function makeContract() payable returns(address)
 
+ #define macro makeContract() = takes(0) returns(1){
+    // store initialisation code in memory 
+    // Storing the first 32 bytes
+    0x6080604052348015600e575f80fd5b50604580601a5f395ff3fe608060405262    
+    0x00 mstore
+
+    // Storing the second 32 bytes
+    0x0caffe5f5260205ff3fea2646970667358221220c4e2943d66b2bc4ea88f53b4
+    0x20 mstore
+
+    // Storing the third 32 bytes
+    0x8d99b5ff576ff9ce01e3a04bf63923154814a06e64736f6c634300081a0033
+    0x40 mstore
+
+   // CREATE operation
+   0x7D                  // Size of the init code (125 bytes)
+   0x00                  // offset: byte offset in the memory in bytes, the initialisation code for the new account.
+   0x00                  // value: value in wei to send to the new account.
+   create
+   0x00 mstore           // Stack Output: []. Save word to memory
+   0x20 0x00 return      // Stack Input: [offset in the memory, byte size of return data] Stack Output: [] | Halt execution returning output data
+ }
 
  #define macro MAIN() = takes(0) returns(0) {
-    
+    0x00                         // Stack Output: [0x00]  push byte offset in the calldata.
+    calldataload                 // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr                     // [func_sig (calldata @ 0x00 >> 0xE0)]
+    __FUNC_SIG(makeContract)     // [func_sig(makeContract), func_sig]
+    eq                           // [func_sig(makeContract) == func_sig]
+    makeContract jumpi           // []
+    0x00 0x00 revert             // Revert if no function signature matched
+    makeContract:
+      makeContract()
  }
+
+// SPDX-License-Identifier: MIT
+//pragma solidity ^0.8.19;
+
+//contract AlwaysCaffe {
+//   fallback() external payable {
+//      assembly {
+//          mstore(0x00, 0xcaffe) // Store 0xcaffe at memory position 0x00
+//           return(0x00, 0x20)     // Return the first 32 bytes (padded)
+//       }
+//    }
+//}
+
+ //bytecode: 6080604052620caffe5f5260205ff3fea2646970667358221220c4e2943d66b2bc4ea88f53b48d99b5ff576ff9ce01e3a04bf63923154814a06e64736f6c634300081a0033
+ //object: 6080604052348015600e575f80fd5b50604580601a5f395ff3fe6080604052620caffe5f5260205ff3fea2646970667358221220c4e2943d66b2bc4ea88f53b48d99b5ff576ff9ce01e3a04bf63923154814a06e64736f6c634300081a0033
