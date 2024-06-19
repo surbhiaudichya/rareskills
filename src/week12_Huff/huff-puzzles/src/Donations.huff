@@ -8,5 +8,45 @@
 #define function donated(address) payable returns(uint256)
 
 #define macro MAIN() = takes(0) returns(0) {
+    0x00                                  // Stack Output: [0x00]  push byte offset in the calldata.
+    calldataload                          // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr                              // [func_sig (calldata @ 0x00 >> 0xE0)]
+    __FUNC_SIG(donated)                    // [func_sig(donate), func_sig]
+    eq
+    getDonationBalance jumpi
     
+    callvalue                             // Stack Output: [msg.value]
+    0x00                                  // Stack Output: [0x00, msg.value]
+    eq                                    // Stack Output: [0x00 = msg.value]
+    zeroCase jumpi
+    caller                                // Stack Output: [msg.sender]
+    0x00                                  // Stack Output: [0x00, msg,sender]
+    mstore                                // Stack Output: [] | Memory Output: [msg.sender]
+    0x20                                  // Stack Output: [0x20] | Memory Output: [msg.sender]
+    0x00                                  // Stack Output: [0x00, 0x20] | Memory Output: [msg.sender]
+    sha3                                  // Stack Output: [key: hash] | Memory Output: []
+    dup1                                  // Stack Output: [hash, hash] 
+    sload                                 // Stack Output: [balance, hash]  
+    callvalue                             // Stack Output: [msg.value, balance, hash]
+    add                                   // Stack Output: [msg.value + balance, hash]
+    swap1                                 // Stack Output: [key: hash, value: newBalance] | key: 32-byte key in storage. and value: 32-byte value to store. 
+    sstore                                // Storage Output: [slot: hash, value: newBalance]
+    0x00 0x00 return
+
+    getDonationBalance:
+    caller                                // Stack Output: [msg.sender]
+    0x00                                  // Stack Output: [0x00, msg.sender]
+    mstore                                // Stack Output: [] | Memory Output: [msg.sender]
+    0x20                                  // Stack Output: [0x20] | Memory Output: [msg.sender]
+    0x00                                  // Stack Output: [offset: 0x00, size: 0x20] | Memory Output: [msg.sender]
+    sha3                                  // Stack Output: [key: hash] | Memory Output: []
+    sload                                 // Stack Output: [balance] | Memory Output: []
+    0x00                                  // Stack Output: [0x00] 
+    mstore                                // Stack Output: [] | Memory Output: [balance]  
+    0x20                                  // Stack Output: [0x00] | Memory Output: [balance] 
+    0x00                                  // Stack Output: [size: 0x20, offset: 0x00] | Memory Output: [balance] 
+    return                                // Halt execution returning output data
+    
+    zeroCase:
+    0x00 0x00 return
 }
