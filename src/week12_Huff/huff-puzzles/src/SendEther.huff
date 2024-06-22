@@ -12,5 +12,22 @@
 
 
  #define macro MAIN() = takes(0) returns(0) {
-    
+    0x00                       // Stack Output: [0x00]  push byte offset in the calldata.
+    calldataload               // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr                   // [func_sig (calldata @ 0x00 >> 0xE0)]
+    __FUNC_SIG(sendEther)      // [func_sig(sendEther), func_sig]
+    eq                         // [func_sig(multiply) == func_sig]
+    sendEther jumpi            // []
+    0x00 0x00 revert           // Revert if no function signature matched
+    sendEther:
+    0x00                       // retSize: byte size to copy (size of the return data).
+    0x00                       // retOffset: byte offset in the memory in bytes, where to store the return data of the sub context.
+    0x00                       // argsSize: byte size to copy (size of the calldata).
+    0x00                       // argsOffset: byte offset in the memory in bytes, the calldata of the sub context.
+    callvalue                  // value in wei to send to the account.
+    0x04 calldataload          // the receiver account which context to execute.
+    gas                        // amount of gas to send to the sub context to execute. 
+    call                       // return 0 if the sub context reverted, 1 otherwise.
+    0x00 mstore                // Save word to memory
+    0x20 0x00 return           // Halt execution returning output data
  }
