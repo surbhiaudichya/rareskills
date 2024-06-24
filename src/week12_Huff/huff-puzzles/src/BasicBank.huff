@@ -12,5 +12,81 @@
 #define function withdraw(uint256) payable returns()
 
 #define macro MAIN() = takes(0) returns(0) {
+    0x00                                  // Stack Output: [0x00]  push byte offset in the calldata.
+    calldataload                          // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+    0xE0 shr                              // [func_sig (calldata @ 0x00 >> 0xE0)]
+    dup1                                  // [func_sig, func_sig]
+    __FUNC_SIG(balanceOf)                 // [func_sig(balanceOf), func_sig, func_sig]
+    eq                                    // [func_sig(balanceOf) == func_sig, func_sig]
+    getDonationBalance jumpi
+    __FUNC_SIG(withdraw)                  // [func_sig(withdraw), func_sig]
+    eq
+    withdrawCase jumpi
+    
+    callvalue                             // Stack Output: [msg.value]
+    0x00                                  // Stack Output: [0x00, msg.value]
+    eq                                    // Stack Output: [0x00 = msg.value]
+    zeroCase jumpi
+    caller                                // Stack Output: [msg.sender]
+    0x00                                  // Stack Output: [0x00, msg,sender]
+    mstore                                // Stack Output: [] | Memory Output: [msg.sender]
+    0x20                                  // Stack Output: [0x20] | Memory Output: [msg.sender]
+    0x00                                  // Stack Output: [0x00, 0x20] | Memory Output: [msg.sender]
+    sha3                                  // Stack Output: [key: hash] | Memory Output: []
+    dup1                                  // Stack Output: [hash, hash] 
+    sload                                 // Stack Output: [balance, hash]  
+    callvalue                             // Stack Output: [msg.value, balance, hash]
+    add                                   // Stack Output: [msg.value + balance, hash]
+    swap1                                 // Stack Output: [key: hash, value: newBalance] | key: 32-byte key in storage. and value: 32-byte value to store. 
+    sstore                                // Storage Output: [slot: hash, value: newBalance]
+    0x00 0x00 return
 
+    getDonationBalance:
+    caller                                // Stack Output: [msg.sender]
+    0x00                                  // Stack Output: [0x00, msg.sender]
+    mstore                                // Stack Output: [] | Memory Output: [msg.sender]
+    0x20                                  // Stack Output: [0x20] | Memory Output: [msg.sender]
+    0x00                                  // Stack Output: [offset: 0x00, size: 0x20] | Memory Output: [msg.sender]
+    sha3                                  // Stack Output: [key: hash] | Memory Output: []
+    sload                                 // Stack Output: [balance] | Memory Output: []
+    0x00                                  // Stack Output: [0x00] 
+    mstore                                // Stack Output: [] | Memory Output: [balance]  
+    0x20                                  // Stack Output: [0x20] | Memory Output: [balance] 
+    0x00                                  // Stack Output: [offset: 0x00, size: 0x20] | Memory Output: [balance] 
+    return                                // Halt execution returning output data
+    
+    withdrawCase:
+    caller                                // Stack Output: [msg.sender]
+    0x00                                  // Stack Output: [0x00, msg.sender]
+    mstore                                // Stack Output: [] | Memory Output: [msg.sender]
+    0x20                                  // Stack Output: [0x20] | Memory Output: [msg.sender]
+    0x00                                  // Stack Output: [offset: 0x00, size: 0x20] | Memory Output: [msg.sender]
+    sha3                                  // Stack Output: [key: hash] | Memory Output: []
+    dup1                                  // Stack Output: [key: hash, key: hash] | Memory Output: [] 
+    sload                                 // Stack Output: [balance, key: hash] | Memory Output: []
+    dup1                                  // Stack Output: [balance, balance, hash] | Memory Output: []
+    0x04 calldataload                     // Stack Output: [withdrawAmount, balance, balance, hash]
+    gt
+    revertCase jumpi                      // Stack Output: [balance, hash]
+    0x04 calldataload                     // Stack Output: [withdrawAmount, balance, hash]
+    swap1                                 // Stack Output: [balance, withdrawAmount, hash]
+    sub                                   // Stack Output: [balance - withdrawAmount, hash]
+    swap1                                 // Stack Output: [key: hash, value: newBalance] | key: 32-byte key in storage. and value: 32-byte value to store. 
+    sstore                                // Storage Output: [slot: hash, value: newBalance]
+    0x00                                  // retSize: byte size to copy (size of the return data).
+    0x00                                  // retOffset: byte offset in the memory in bytes, where to store the return data of the sub context.
+    0x00                                  // argsSize: byte size to copy (size of the calldata).
+    0x00                                  // argsOffset: byte offset in the memory in bytes, the calldata of the sub context.
+    0x04 calldataload                     // value in wei to send to the account.
+    caller                                // the receiver account which context to execute.
+    gas                                   // amount of gas to send to the sub context to execute. 
+    call                                  // return 0 if the sub context reverted, 1 otherwise.
+    0x00 mstore                           // Save word to memory
+    0x20 0x00 return                      // Halt execution returning output data
+
+    zeroCase:
+    0x00 0x00 return
+
+    revertCase:
+    0x00 0x00 revert
 }
