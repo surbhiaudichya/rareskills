@@ -14,5 +14,74 @@
 
 
  #define macro MAIN() = takes(0) returns(0) {
-   
+   0x00                     // Stack Output: [0x00]  push byte offset in the calldata.
+   calldataload             // Stack Output: [calldata @ 0x00] 32-byte value starting from the given offset of the calldata.
+   0xE0 shr                 // [func_sig (calldata @ 0x00 >> 0xE0)]
+   __FUNC_SIG(distribute)   // [func_sig(distribute), func_sig]
+   eq                       // [func_sig(distribute), func_sig]
+   distribute jumpi         // []
+   0x00 0x00 revert         // Revert if no function signature matched
+   distribute:
+    0x24                      // Stack Output: [0x24] | offset 
+    calldataload              // Stack Output: [length] | length of array
+    dup1                      // Stack Output: [length, length]
+    0x00
+    eq 
+    emptyArray jumpi
+    dup1                      // Stack Output: [length, length]
+    callvalue                 // Stack Output: [callvalue, length, length]
+    div                       // Stack Output: [callvalue/length, length]
+    swap1                     // Stack Output: [length, callvalue/length]
+    0x20                      // Stack Output: [0x20, length, amount]  | (length * 0x20) + 0x24 will be the offset for the last number
+    mul
+    0x24                      // Stack Output: [0x24, array total size, amount]
+    add                       // Stack Output: [@0xoffset_of_last_item_array, amount] offset for last item in array 
+    
+    0x44                      // Stack Output: [0x44, @0xoffset_of_last_item_array, amount]
+    doWhileLoop jump
+                              // Stack Input: [offset_array_item, offset_last_array_item, amount]
+                              // Step1: calldataload the array item, send amount  
+                              // Step2: i++ i.e adding 20 bytes to prev array item offset
+                              // Step3: Check if new offset is greater than last array item offset. If yes, finish loop. else got to step 1. 
+    doWhileLoop:
+                              // step 1 
+        dup1                  // Stack Output: [0x44, 0x44, @0xoffset_of_last_item_array, amount]
+        calldataload          // Stack Output: [arrayItem1, 0x44, @0xoffset_of_last_item_array, amount]
+        swap1                 // Stack Output: [0x44, arrayItem1, @0xoffset_of_last_item_array, amount] 
+        swap3                 // Stack Output: [amount, arrayItem1, @0xoffset_of_last_item_array, 0x44]
+                              // Stack Input: [amount, arrayItem1, @0xoffset_of_last_item_array, 0x44]
+        0x00                  // retSize: byte size to copy (size of the return data).
+        0x00                  // retOffset: byte offset in the memory in bytes, where to store the return data of the sub context.
+        0x00                  // argsSize: byte size to copy (size of the calldata).
+        0x00                  // argsOffset: byte offset in the memory in bytes, the calldata of the sub context.
+        dup5                  // [amount, 0, 0, 0, 0, amount, arrayItem1, @0xoffset_of_last_item_array, 0x44] | value in wei to send to the account. 
+        dup7                  // [arrayItem1, amount, 0, 0, 0, 0, amount, arrayItem1, @0xoffset_of_last_item_array, 0x44] | the receiver account which context to execute.
+        gas                   // amount of gas to send to the sub context to execute. 
+        call                  // return 0 if the sub context reverted, 1 otherwise.
+                              // [0 or 1, amount, arrayItem1, @0xoffset_of_last_item_array, 0x44]
+        pop                   // [amount, arrayItem1, @0xoffset_of_last_item_array, 0x44]
+        swap1                 // [arrayItem1, amount, @0xoffset_of_last_item_array, 0x44]
+        pop                   // [amount, @0xoffset_of_last_item_array, 0x44]
+                              
+                              // Step 2 
+        swap2                 // Stack Output: [0x44, @0xoffset_of_last_item_array, amount] 
+        0x20                  // Stack Output: [0x20, 0x44, @0xoffset_of_last_item_array, amount]  
+        add                   // Stack Output: [0x20 + 0x44, @0xoffset_of_last_item_array, amount] | offset of next array item in calldata
+
+                              // Step 3: 
+        dup1                  // Stack Output: [0x64, 0x64, @0xoffset_of_last_item_array, amount] 
+        swap2                 // Stack Output: [@0xoffset_of_last_item_array, 0x64, 0x64, amount]
+        dup1                  // Stack Output: [@0xoffset_of_last_item_array, @0xoffset_of_last_item_array, 0x64, 0x64, amount]  
+        swap2                 // Stack Output: [0x64, @0xoffset_of_last_item_array, @0xoffset_of_last_item_array, 0x64, amount] 
+        gt                    // Stack Output: [0x64 > @0xoffset_of_last_item_array, @0xoffset_of_last_item_array, 0x64, amount]  
+        haltDoWhileLoop jumpi // Stack Output: [0x64 > @0xoffset_of_last_item_array ? 1 | 0, @0xoffset_of_last_item_array, 0x64, amount]  
+
+        swap1                 // Stack Output: [0x64, @0xoffset_of_last_item_array, amount]
+        doWhileLoop jump 
+
+        haltDoWhileLoop:
+        0x00 0x00 return      // Stack Input: [offset in the memory, byte size of return data] Stack Output: [] | Halt execution returning output data   
+        
+        emptyArray: 
+        0x00 0x00 revert      // empty array 
  }
